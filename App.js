@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useContext, createContext, useCallback, useMemo } from 'react';
 import { HashRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
@@ -14,6 +15,12 @@ const TrashIcon = () => React.createElement("svg", { xmlns: "http://www.w3.org/2
 const ChartBarIcon = () => React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: "h-6 w-6", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement("path", { d: "M3 13h2v7H3v-7zm4 5h2v2H7v-2zm4-10h2v12h-2V8zm4 5h2v7h-2v-7zm4-3h2v10h-2V10z" }));
 const CalendarIcon = () => React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: "h-6 w-6", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement("path", { d: "M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H4V8h16v13z" }));
 const CogIcon = () => React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: "h-6 w-6", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement("path", { d: "M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49 1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61.22l2-3.46c.12-.22-.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z" }));
+const PencilIcon = () => React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", viewBox: "0 0 20 20", fill: "currentColor" }, React.createElement("path", { d: "M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" }), React.createElement("path", { fillRule: "evenodd", d: "M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z", clipRule: "evenodd" }));
+const CheckIcon = () => React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", viewBox: "0 0 20 20", fill: "currentColor" }, React.createElement("path", { fillRule: "evenodd", d: "M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z", clipRule: "evenodd" }));
+const XIcon = () => React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", viewBox: "0 0 20 20", fill: "currentColor" }, React.createElement("path", { fillRule: "evenodd", d: "M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z", clipRule: "evenodd" }));
+const ChevronUpIcon = () => React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", viewBox: "0 0 20 20", fill: "currentColor" }, React.createElement("path", { fillRule: "evenodd", d: "M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z", clipRule: "evenodd" }));
+const ChevronDownIcon = () => React.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", viewBox: "0 0 20 20", fill: "currentColor" }, React.createElement("path", { fillRule: "evenodd", d: "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z", clipRule: "evenodd" }));
+
 
 // --- CONTEXT ---
 const AppContext = createContext(null);
@@ -227,11 +234,30 @@ const PageWrapper = ({ children, title }) => (
 // --- SCREENS ---
 const InitialSetupScreen = ({ onComplete }) => {
     const { settings, saveSettings } = useAppContext();
-    const [monthlyIncome, setMonthlyIncome] = useState(settings?.monthlyIncome || 300000);
-    const [initialBalance, setInitialBalance] = useState(settings?.initialBalance || 1000000);
-    const [categories, setCategories] = useState(settings?.expenseCategories || [{id: 'c1', name: '食費'}, {id: 'c2', name: '住居費'}]);
+    
+    const [monthlyIncome, setMonthlyIncome] = useState(settings?.monthlyIncome ?? 300000);
+    const [summerBonusIncome, setSummerBonusIncome] = useState(settings?.summerBonusIncome ?? 0);
+    const [winterBonusIncome, setWinterBonusIncome] = useState(settings?.winterBonusIncome ?? 0);
+    const [initialBalance, setInitialBalance] = useState(settings?.initialBalance ?? 1000000);
+    const [categories, setCategories] = useState(settings?.expenseCategories ?? [{id: 'c1', name: '食費'}, {id: 'c2', name: '住居費'}]);
+    const [summerBonusMonths, setSummerBonusMonths] = useState(settings?.summerBonusMonths ?? [7]);
+    const [winterBonusMonths, setWinterBonusMonths] = useState(settings?.winterBonusMonths ?? [12]);
+    
     const [newCategoryName, setNewCategoryName] = useState('');
-    const [bonusMonths, setBonusMonths] = useState(settings?.bonusMonths || [7, 12]);
+    const [editingCategoryId, setEditingCategoryId] = useState(null);
+    const [editingCategoryName, setEditingCategoryName] = useState('');
+
+    useEffect(() => {
+        if (settings) {
+            setMonthlyIncome(settings.monthlyIncome ?? 300000);
+            setSummerBonusIncome(settings.summerBonusIncome ?? 0);
+            setWinterBonusIncome(settings.winterBonusIncome ?? 0);
+            setInitialBalance(settings.initialBalance ?? 1000000);
+            setCategories(settings.expenseCategories ?? [{id: 'c1', name: '食費'}, {id: 'c2', name: '住居費'}]);
+            setSummerBonusMonths(settings.summerBonusMonths ?? [7]);
+            setWinterBonusMonths(settings.winterBonusMonths ?? [12]);
+        }
+    }, [settings]);
 
     const addCategory = () => {
         if (newCategoryName.trim() !== '') {
@@ -244,13 +270,51 @@ const InitialSetupScreen = ({ onComplete }) => {
         setCategories(categories.filter(c => c.id !== id));
     };
 
-    const toggleBonusMonth = (month) => {
-        setBonusMonths(prev => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month].sort((a,b)=>a-b));
+    const startEditing = (category) => {
+        setEditingCategoryId(category.id);
+        setEditingCategoryName(category.name);
+    };
+
+    const saveEdit = () => {
+        if (editingCategoryName.trim() === '') {
+            alert('カテゴリ名は空にできません。');
+            return;
+        }
+        setCategories(categories.map(cat => 
+            cat.id === editingCategoryId ? { ...cat, name: editingCategoryName.trim() } : cat
+        ));
+        setEditingCategoryId(null);
+        setEditingCategoryName('');
+    };
+
+    const cancelEdit = () => {
+        setEditingCategoryId(null);
+        setEditingCategoryName('');
+    };
+    
+    const moveCategory = (index, direction) => {
+        const newCategories = [...categories];
+        const [movedItem] = newCategories.splice(index, 1);
+        newCategories.splice(index + direction, 0, movedItem);
+        setCategories(newCategories);
+    };
+
+    const toggleBonusMonth = (month, type) => {
+        const setter = type === 'summer' ? setSummerBonusMonths : setWinterBonusMonths;
+        setter(prev => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month].sort((a,b)=>a-b));
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        saveSettings({ monthlyIncome, initialBalance, expenseCategories: categories, bonusMonths });
+        saveSettings({ 
+            monthlyIncome, 
+            summerBonusIncome, 
+            winterBonusIncome, 
+            initialBalance, 
+            expenseCategories: categories, 
+            summerBonusMonths,
+            winterBonusMonths,
+        });
         alert('設定を保存しました。');
         onComplete();
     };
@@ -259,35 +323,71 @@ const InitialSetupScreen = ({ onComplete }) => {
         React.createElement(Card, null,
             React.createElement("form", { onSubmit: handleSubmit, className: "space-y-6" },
                 React.createElement(Input, { label: "月収", type: "number", value: monthlyIncome, onChange: e => setMonthlyIncome(parseFloat(e.target.value) || 0), required: true }),
+                React.createElement(Input, { label: "夏季賞与", type: "number", value: summerBonusIncome, onChange: e => setSummerBonusIncome(parseFloat(e.target.value) || 0), placeholder: "夏季賞与の金額" }),
+                React.createElement(Input, { label: "冬季賞与", type: "number", value: winterBonusIncome, onChange: e => setWinterBonusIncome(parseFloat(e.target.value) || 0), placeholder: "冬季賞与の金額" }),
                 React.createElement(Input, { label: "初期残高", type: "number", value: initialBalance, onChange: e => setInitialBalance(parseFloat(e.target.value) || 0), required: true }),
                 
                 React.createElement("div", null,
                     React.createElement("h3", { className: "text-lg font-medium text-gray-900 dark:text-gray-100 mb-2" }, "支出カテゴリ"),
                     React.createElement("div", { className: "space-y-2" },
-                        categories.map(cat => (
-                            React.createElement("div", { key: cat.id, className: "flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-700 rounded" },
-                                React.createElement("span", { className: "flex-grow" }, cat.name),
-                                React.createElement("button", { type: "button", onClick: () => removeCategory(cat.id), className: "text-red-500 hover:text-red-700" },
-                                    React.createElement(TrashIcon, null)
+                        categories.map((cat, index) => (
+                            React.createElement("div", { key: cat.id, className: "flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-md" },
+                                editingCategoryId === cat.id ? (
+                                    // Editing View
+                                    React.createElement(React.Fragment, null,
+                                        React.createElement("input", { 
+                                            type: "text", 
+                                            value: editingCategoryName, 
+                                            onChange: e => setEditingCategoryName(e.target.value),
+                                            className: "flex-grow px-2 py-1 text-gray-900 bg-white dark:bg-gray-600 dark:text-gray-100 border border-gray-300 dark:border-gray-500 rounded-md"
+                                        }),
+                                        React.createElement("button", { type: "button", onClick: saveEdit, className: "text-green-500 hover:text-green-700 p-1" }, React.createElement(CheckIcon, null)),
+                                        React.createElement("button", { type: "button", onClick: cancelEdit, className: "text-gray-500 hover:text-gray-700 p-1" }, React.createElement(XIcon, null))
+                                    )
+                                ) : (
+                                    // Normal View
+                                    React.createElement(React.Fragment, null,
+                                        React.createElement("div", { className: "flex flex-col" },
+                                            React.createElement("button", { type: "button", onClick: () => moveCategory(index, -1), disabled: index === 0, className: "disabled:opacity-25 hover:bg-gray-200 dark:hover:bg-gray-600 rounded" }, React.createElement(ChevronUpIcon, null)),
+                                            React.createElement("button", { type: "button", onClick: () => moveCategory(index, 1), disabled: index === categories.length - 1, className: "disabled:opacity-25 hover:bg-gray-200 dark:hover:bg-gray-600 rounded" }, React.createElement(ChevronDownIcon, null))
+                                        ),
+                                        React.createElement("span", { className: "flex-grow ml-2" }, cat.name),
+                                        React.createElement("button", { type: "button", onClick: () => startEditing(cat), className: "text-blue-500 hover:text-blue-700 p-1 rounded" }, React.createElement(PencilIcon, null)),
+                                        React.createElement("button", { type: "button", onClick: () => removeCategory(cat.id), className: "text-red-500 hover:text-red-700 p-1 rounded" }, React.createElement(TrashIcon, null))
+                                    )
                                 )
                             )
                         ))
                     ),
                     React.createElement("div", { className: "flex gap-2 mt-2" },
-                        React.createElement(Input, { label: "新しいカテゴリ名", type: "text", value: newCategoryName, onChange: e => setNewCategoryName(e.target.value) }),
+                        React.createElement(Input, { label: "新しいカテゴリ名", type: "text", value: newCategoryName, onChange: e => setNewCategoryName(e.target.value), placeholder:"新しいカテゴリ..." }),
                         React.createElement(Button, { onClick: addCategory, className: "mt-auto h-[42px]" }, React.createElement(PlusIcon, null))
                     )
                 ),
 
                 React.createElement("div", null,
-                    React.createElement("h3", { className: "text-lg font-medium text-gray-900 dark:text-gray-100 mb-2" }, "ボーナス月"),
-                    React.createElement("div", { className: "grid grid-cols-4 sm:grid-cols-6 gap-2" },
-                        MONTH_NAMES.map((name, index) => (
-                             React.createElement("label", { key: index, className: `flex items-center justify-center p-2 border rounded-md cursor-pointer transition-colors ${bonusMonths.includes(index + 1) ? 'bg-blue-500 text-white border-blue-500' : 'bg-gray-100 dark:bg-gray-700 dark:border-gray-600'}`},
-                                 React.createElement("input", { type: "checkbox", checked: bonusMonths.includes(index+1), onChange: () => toggleBonusMonth(index+1), className: "sr-only" }),
-                                 name
-                             )
-                        ))
+                    React.createElement("h3", { className: "text-lg font-medium text-gray-900 dark:text-gray-100 mb-2" }, "ボーナス月設定"),
+                    React.createElement("div", { className: "mb-4" },
+                        React.createElement("h4", { className: "text-md font-medium text-yellow-600 dark:text-yellow-400 mb-2" }, "夏季ボーナス月"),
+                        React.createElement("div", { className: "grid grid-cols-4 sm:grid-cols-6 gap-2" },
+                            MONTH_NAMES.map((name, index) => (
+                                React.createElement("label", { key: `summer-${index}`, className: `flex items-center justify-center p-2 border rounded-md cursor-pointer transition-colors ${summerBonusMonths.includes(index + 1) ? 'bg-yellow-500 text-white border-yellow-500' : 'bg-gray-100 dark:bg-gray-700 dark:border-gray-600'}`},
+                                    React.createElement("input", { type: "checkbox", checked: summerBonusMonths.includes(index + 1), onChange: () => toggleBonusMonth(index + 1, 'summer'), className: "sr-only" }),
+                                    name
+                                )
+                            ))
+                        )
+                    ),
+                    React.createElement("div", null,
+                        React.createElement("h4", { className: "text-md font-medium text-sky-600 dark:text-sky-400 mb-2" }, "冬季ボーナス月"),
+                        React.createElement("div", { className: "grid grid-cols-4 sm:grid-cols-6 gap-2" },
+                             MONTH_NAMES.map((name, index) => (
+                                React.createElement("label", { key: `winter-${index}`, className: `flex items-center justify-center p-2 border rounded-md cursor-pointer transition-colors ${winterBonusMonths.includes(index + 1) ? 'bg-sky-500 text-white border-sky-500' : 'bg-gray-100 dark:bg-gray-700 dark:border-gray-600'}`},
+                                    React.createElement("input", { type: "checkbox", checked: winterBonusMonths.includes(index + 1), onChange: () => toggleBonusMonth(index + 1, 'winter'), className: "sr-only" }),
+                                    name
+                                )
+                            ))
+                        )
                     )
                 ),
                 
@@ -296,6 +396,7 @@ const InitialSetupScreen = ({ onComplete }) => {
         )
     );
 };
+
 
 const AnnualSetupScreen = () => {
     const { settings, annualData, saveAnnualData } = useAppContext();
@@ -464,7 +565,9 @@ const MonthlyTrackerScreen = () => {
     
     const yearData = annualData[year];
 
-    const isBonusMonth = settings?.bonusMonths.includes(month + 1);
+    const isSummerBonusMonth = settings?.summerBonusMonths?.includes(month + 1);
+    const isWinterBonusMonth = settings?.winterBonusMonths?.includes(month + 1);
+    const isBonusMonth = isSummerBonusMonth || isWinterBonusMonth;
     const budget = yearData?.budget?.[isBonusMonth ? 'bonusMonthBudget' : 'normalMonthBudget'];
     const totalBudget = budget ? Object.values(budget).reduce((sum, val) => sum + val, 0) : 0;
     
@@ -507,6 +610,25 @@ const MonthlyTrackerScreen = () => {
         });
         setIsModalOpen(false);
     };
+    
+    const handleAddBonus = useCallback((type) => {
+        const isSummer = type === 'summer';
+        const bonusAmount = isSummer ? settings.summerBonusIncome : settings.winterBonusIncome;
+        const bonusDescription = isSummer ? '夏季賞与' : '冬季賞与';
+
+        if (!bonusAmount || bonusAmount <= 0) {
+            alert(`${bonusDescription}が設定されていません。設定画面で金額を入力してください。`);
+            return;
+        }
+        addTransaction(year, {
+            id: `tx${Date.now()}`,
+            type: 'income',
+            amount: bonusAmount,
+            description: bonusDescription,
+            categoryId: '',
+            date: new Date(year, month, 15).toISOString().split('T')[0] // その月の15日に設定
+        });
+    }, [settings, addTransaction, year, month]);
 
     if (!settings || !yearData) {
         return (
@@ -524,18 +646,26 @@ const MonthlyTrackerScreen = () => {
     return (
         React.createElement(PageWrapper, { title: "月次記録" },
             React.createElement("div", { className: "flex justify-between items-center mb-6" },
-                React.createElement("div", { className: "flex gap-2" },
+                React.createElement("div", { className: "flex gap-2 items-center" },
                     React.createElement(Button, { onClick: () => setCurrentDate(new Date(year, month - 1)) }, "< 前月"),
                     React.createElement("h3", { className: "text-2xl font-bold p-2" }, `${year}年 ${MONTH_NAMES[month]}`),
                     React.createElement(Button, { onClick: () => setCurrentDate(new Date(year, month + 1)) }, "次月 >")
                 ),
-                React.createElement(Button, { onClick: handleOpenModal }, React.createElement(PlusIcon, null), "収支を追加")
+                React.createElement("div", { className: "flex gap-2" },
+                    isSummerBonusMonth && settings?.summerBonusIncome > 0 && (
+                        React.createElement(Button, { onClick: () => handleAddBonus('summer'), className: "bg-yellow-500 hover:bg-yellow-600" }, "夏季賞与を追加")
+                    ),
+                    isWinterBonusMonth && settings?.winterBonusIncome > 0 && (
+                        React.createElement(Button, { onClick: () => handleAddBonus('winter'), className: "bg-sky-500 hover:bg-sky-600" }, "冬季賞与を追加")
+                    ),
+                    React.createElement(Button, { onClick: handleOpenModal }, React.createElement(PlusIcon, null), "収支を追加")
+                )
             ),
 
             React.createElement(Card, { className: "mb-6" },
                 React.createElement("h3", { className: "text-lg font-medium text-gray-500 dark:text-gray-400" }, 
                     "今月の残予算 ",
-                    isBonusMonth && React.createElement("span", { className: "text-xs text-yellow-500" }, "(ボーナス月)")
+                    isBonusMonth && React.createElement("span", { className: `text-xs ${isSummerBonusMonth ? 'text-yellow-500' : 'text-sky-500'}` }, "(ボーナス月)")
                 ),
                 React.createElement("p", { className: `text-5xl font-bold ${remainingBudget >= 0 ? 'text-blue-500' : 'text-red-500'}` }, formatCurrency(remainingBudget)),
                 React.createElement("div", { className: "mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" },
@@ -780,7 +910,7 @@ const AppRoutes = () => {
             navigate('/setup', { replace: true });
         } else if (settings && !hasAnnualData && currentPath !== '/setup') {
             navigate('/setup', { replace: true });
-        } else if (settings && hasAnnualData && (currentPath === '/' || currentPath === '/setup')) {
+        } else if (settings && hasAnnualData && currentPath === '/') {
             navigate('/monthly', { replace: true });
         } else if (!settings && currentPath === '/') {
             navigate('/setup', {replace: true});
