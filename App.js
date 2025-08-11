@@ -1,8 +1,10 @@
 
 import React, { useState, useEffect, useContext, createContext, useCallback, useMemo } from 'react';
-import { HashRouter, Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, NavLink, useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { GoogleGenAI } from '@google/genai';
 import { MONTH_NAMES } from './constants.js';
+import { auth, db } from './firebase.js';
 
 // --- UTILS ---
 const formatCurrency = (amount) => {
@@ -16,126 +18,141 @@ const PencilIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/
 const ChartBarIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-6 w-6", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M3 13h2v7H3v-7zm4 5h2v2H7v-2zm4-10h2v12h-2V8zm4 5h2v7h-2v-7zm4-3h2v10h-2V10z" }));
 const CalendarIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-6 w-6", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H4V8h16v13z" }));
 const CogIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-6 w-6", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49 1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61.22l2-3.46c.12-.22-.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z" }));
+const LightBulbIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", viewBox: "0 0 20 20", fill: "currentColor" }, React.createElement('path', { d: "M10 2a6 6 0 00-6 6c0 3.31 1.67 6.22 4.2 7.72.32.18.5.52.5.88v1.4h2.6v-1.4c0-.36.18-.7.5-.88C14.33 14.22 16 11.31 16 8a6 6 0 00-6-6zm1.75 13h-3.5a.75.75 0 010-1.5h3.5a.75.75 0 010 1.5z" }));
 
-// --- CONTEXT ---
+// --- CONTEXTS ---
+const AuthContext = createContext(null);
+const useAuth = () => useContext(AuthContext);
+
+const AuthProvider = ({ children }) => {
+    const [currentUser, setCurrentUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const unsubscribe = auth.onAuthStateChanged(user => {
+            setCurrentUser(user);
+            setLoading(false);
+        });
+        return unsubscribe;
+    }, []);
+
+    const signup = (email, password) => auth.createUserWithEmailAndPassword(email, password);
+    const login = (email, password) => auth.signInWithEmailAndPassword(email, password);
+    const logout = () => auth.signOut();
+
+    const value = { currentUser, loading, signup, login, logout };
+
+    return React.createElement(AuthContext.Provider, { value }, !loading && children);
+};
+
 const AppContext = createContext(null);
 
 const AppContextProvider = ({ children }) => {
-  const [state, setState] = useState({
-    settings: null,
-    annualData: {},
-  });
+    const [settings, setSettings] = useState(null);
+    const [allBudgets, setAllBudgets] = useState({});
+    const [allTransactions, setAllTransactions] = useState([]);
+    const [allActualBalances, setAllActualBalances] = useState({});
+    const [loading, setLoading] = useState(true);
+    const { currentUser } = useAuth();
 
-  useEffect(() => {
-    try {
-      const savedState = localStorage.getItem('financeTrackerState');
-      if (savedState) {
-        setState(JSON.parse(savedState));
-      }
-    } catch (error) {
-      console.error("Failed to load state from localStorage", error);
-    }
-  }, []);
+    const userRef = useMemo(() => currentUser ? db.collection('users').doc(currentUser.uid) : null, [currentUser]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('financeTrackerState', JSON.stringify(state));
-    } catch (error) {
-      console.error("Failed to save state to localStorage", error);
-    }
-  }, [state]);
+    useEffect(() => {
+        if (!userRef) {
+            setSettings(null);
+            setAllBudgets({});
+            setAllTransactions([]);
+            setAllActualBalances({});
+            setLoading(false);
+            return;
+        }
 
-  const saveSettings = (settings) => {
-    setState(prev => ({ ...prev, settings }));
-  };
+        setLoading(true);
+        const unsubscribeSettings = userRef.onSnapshot(doc => {
+            setSettings(doc.exists ? doc.data().settings : null);
+            setLoading(false);
+        });
 
-  const saveAnnualData = (year, data) => {
-    setState(prev => ({
-      ...prev,
-      annualData: { ...prev.annualData, [year]: data },
-    }));
-  };
+        const unsubscribeBudgets = userRef.collection('budgets').onSnapshot(snapshot => {
+            const budgetsData = {};
+            snapshot.forEach(doc => {
+                budgetsData[doc.id] = doc.data();
+            });
+            setAllBudgets(budgetsData);
+        });
 
-  const addTransaction = (year, transaction) => {
-    setState(prev => {
-      const yearData = prev.annualData[year];
-      if (!yearData) return prev;
-      return {
-        ...prev,
-        annualData: {
-          ...prev.annualData,
-          [year]: {
-            ...yearData,
-            transactions: [...yearData.transactions, transaction].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-          },
-        },
-      };
-    });
-  };
-
-  const updateTransaction = (year, updatedTx) => {
-    setState(prev => {
-      const yearData = prev.annualData[year];
-      if (!yearData) return prev;
-      
-      const newTransactions = yearData.transactions.map(tx => 
-        tx.id === updatedTx.id ? updatedTx : tx
-      ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      return {
-        ...prev,
-        annualData: {
-          ...prev.annualData,
-          [year]: {
-            ...yearData,
-            transactions: newTransactions,
-          },
-        },
-      };
-    });
-  };
-
-  const deleteTransaction = (year, transactionId) => {
-    setState(prev => {
-      const yearData = prev.annualData[year];
-      if (!yearData) return prev;
-      
-      const newTransactions = yearData.transactions.filter(tx => tx.id !== transactionId);
-
-      return {
-        ...prev,
-        annualData: {
-          ...prev.annualData,
-          [year]: {
-            ...yearData,
-            transactions: newTransactions,
-          },
-        },
-      };
-    });
-  };
-
-  const updateActualBalance = (year, month, balance) => {
-    setState(prev => {
-      const yearData = prev.annualData[year];
-      if (!yearData) return prev;
-      const newActualBalances = [...yearData.actualBalances];
-      newActualBalances[month] = balance;
-      return {
-        ...prev,
-        annualData: {
-          ...prev.annualData,
-          [year]: {
-            ...yearData,
-            actualBalances: newActualBalances,
-          },
-        },
-      };
-    });
-  };
+        const unsubscribeTransactions = userRef.collection('transactions').orderBy('date', 'desc').onSnapshot(snapshot => {
+            const transactionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setAllTransactions(transactionsData);
+        });
+        
+        const unsubscribeActualBalances = userRef.collection('actualBalances').onSnapshot(snapshot => {
+            const balancesData = {};
+            snapshot.forEach(doc => {
+                 balancesData[doc.id] = doc.data().balances;
+            });
+            setAllActualBalances(balancesData);
+        });
 
 
-  return React.createElement(AppContext.Provider, { value: { ...state, saveSettings, saveAnnualData, addTransaction, updateTransaction, deleteTransaction, updateActualBalance } }, children);
+        return () => {
+            unsubscribeSettings();
+            unsubscribeBudgets();
+            unsubscribeTransactions();
+            unsubscribeActualBalances();
+        };
+    }, [userRef]);
+
+    const saveSettings = useCallback(async (newSettings) => {
+        if (!userRef) return Promise.reject("User not authenticated");
+        await userRef.set({ settings: newSettings }, { merge: true });
+    }, [userRef]);
+
+    const saveAnnualSetup = useCallback(async (year, budgetData, balancesData) => {
+        if (!userRef) return Promise.reject("User not authenticated");
+        const budgetRef = userRef.collection('budgets').doc(String(year));
+        const actualBalanceRef = userRef.collection('actualBalances').doc(String(year));
+        await budgetRef.set(budgetData);
+        await actualBalanceRef.set({ balances: balancesData });
+    }, [userRef]);
+
+    const addTransaction = useCallback(async (transaction) => {
+        if (!userRef) return Promise.reject("User not authenticated");
+        await userRef.collection('transactions').add(transaction);
+    }, [userRef]);
+
+    const updateTransaction = useCallback(async (transactionId, updatedTx) => {
+        if (!userRef) return Promise.reject("User not authenticated");
+        await userRef.collection('transactions').doc(transactionId).update(updatedTx);
+    }, [userRef]);
+
+    const deleteTransaction = useCallback(async (transactionId) => {
+        if (!userRef) return Promise.reject("User not authenticated");
+        await userRef.collection('transactions').doc(transactionId).delete();
+    }, [userRef]);
+
+    const updateActualBalance = useCallback(async (year, month, balance) => {
+        if (!userRef) return Promise.reject("User not authenticated");
+        const newBalances = [...(allActualBalances[year] || Array(12).fill(null))];
+        newBalances[month] = balance;
+        await userRef.collection('actualBalances').doc(String(year)).set({ balances: newBalances });
+    }, [userRef, allActualBalances]);
+
+    const value = {
+        settings,
+        allBudgets,
+        allTransactions,
+        allActualBalances,
+        loading,
+        saveSettings,
+        saveAnnualSetup,
+        addTransaction,
+        updateTransaction,
+        deleteTransaction,
+        updateActualBalance,
+    };
+
+    return React.createElement(AppContext.Provider, { value }, children);
 };
 
 const useAppContext = () => {
@@ -144,7 +161,7 @@ const useAppContext = () => {
         throw new Error('useAppContext must be used within an AppContextProvider');
     }
     return context;
-}
+};
 
 // --- UI COMPONENTS ---
 const Card = ({ children, className = '' }) => (
@@ -191,7 +208,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
     return (
         React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center", 'aria-modal': "true", role: "dialog", onClick: onClose },
-            React.createElement('div', { className: "bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 m-4", onClick: e => e.stopPropagation() },
+            React.createElement('div', { className: "bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 m-4 max-h-[90vh] overflow-y-auto", onClick: e => e.stopPropagation() },
                 React.createElement('div', { className: "flex justify-between items-center mb-4" },
                     React.createElement('h2', { className: "text-xl font-bold" }, title),
                     React.createElement('button', { onClick: onClose, className: "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-3xl leading-none" }, '×')
@@ -202,11 +219,22 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     );
 };
 
-
 // --- LAYOUT COMPONENTS ---
 const Header = () => {
     const { settings } = useAppContext();
+    const { currentUser, logout } = useAuth();
+    const navigate = useNavigate();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    const handleLogout = async () => {
+        try {
+            await logout();
+            navigate('/login');
+        } catch (error) {
+            console.error("Failed to log out", error);
+            alert("ログアウトに失敗しました。");
+        }
+    };
 
     const navLinkClasses = "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors";
     const mobileNavLinkClasses = "block text-base";
@@ -233,10 +261,14 @@ const Header = () => {
             React.createElement('nav', { className: "container mx-auto px-4 sm:px-6 lg:px-8" },
                 React.createElement('div', { className: "flex items-center justify-between h-16" },
                     React.createElement('div', { className: "flex-shrink-0" },
-                        React.createElement(NavLink, { to: "/", className: "text-2xl font-bold text-blue-600 dark:text-blue-400" }, "家計簿アプリ")
+                        React.createElement(NavLink, { to: "/", className: "text-2xl font-bold text-blue-600 dark:text-blue-400" }, "AI家計簿")
                     ),
                     React.createElement('div', { className: "hidden md:flex items-baseline space-x-4" },
-                        React.createElement(NavLinks)
+                         React.createElement(NavLinks),
+                         currentUser && React.createElement('div', { className: "flex items-center gap-4" },
+                             React.createElement('span', { className: "text-sm text-gray-500" }, currentUser.email),
+                             React.createElement('button', { onClick: handleLogout, className: "px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700" }, "ログアウト")
+                         )
                     ),
                     React.createElement('div', { className: "md:hidden flex items-center" },
                         React.createElement('button', { onClick: () => setIsMobileMenuOpen(!isMobileMenuOpen), className: "inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white", 'aria-controls': "mobile-menu", 'aria-expanded': isMobileMenuOpen },
@@ -252,7 +284,15 @@ const Header = () => {
             ),
             React.createElement('div', { className: `${isMobileMenuOpen ? 'block' : 'hidden'} md:hidden`, id: "mobile-menu" },
                 React.createElement('div', { className: "px-2 pt-2 pb-3 space-y-1 sm:px-3" },
-                    React.createElement(NavLinks, { isMobile: true })
+                    React.createElement(NavLinks, { isMobile: true }),
+                     currentUser && React.createElement('div', { className: "border-t border-gray-700 pt-4 pb-3" },
+                        React.createElement('div', { className: "flex items-center px-5" },
+                            React.createElement('div', { className: "text-base font-medium leading-none text-white" }, currentUser.email)
+                        ),
+                        React.createElement('div', { className: "mt-3 px-2 space-y-1" },
+                            React.createElement('button', { onClick: handleLogout, className: "block w-full text-left rounded-md px-3 py-2 text-base font-medium text-gray-400 hover:text-white hover:bg-gray-700" }, "ログアウト")
+                        )
+                    )
                 )
             )
         )
@@ -269,6 +309,65 @@ const PageWrapper = ({ children, title }) => (
 );
 
 // --- SCREENS ---
+
+const AuthForm = ({ isLogin = false }) => {
+    const { signup, login } = useAuth();
+    const navigate = useNavigate();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        try {
+            if (isLogin) {
+                await login(email, password);
+            } else {
+                await signup(email, password);
+            }
+            navigate('/');
+        } catch (err) {
+            let message = "エラーが発生しました。";
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+                message = "メールアドレスまたはパスワードが間違っています。";
+            } else if (err.code === 'auth/email-already-in-use') {
+                message = "このメールアドレスは既に使用されています。";
+            } else if (err.code === 'auth/weak-password') {
+                message = "パスワードは6文字以上で入力してください。";
+            }
+            setError(message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const title = isLogin ? "ログイン" : "新規登録";
+    const buttonText = isLogin ? "ログイン" : "登録";
+    const linkText = isLogin ? "アカウントをお持ちでないですか？ 新規登録" : "既にアカウントをお持ちですか？ ログイン";
+    const linkTo = isLogin ? "/signup" : "/login";
+
+    return React.createElement('div', { className: "min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-4" },
+        React.createElement(Card, { className: "w-full max-w-md" },
+            React.createElement('h2', { className: "text-2xl font-bold text-center mb-6" }, title),
+            React.createElement('form', { onSubmit: handleSubmit, className: "space-y-4" },
+                React.createElement(Input, { label: "メールアドレス", type: "email", value: email, onChange: e => setEmail(e.target.value), required: true, placeholder: "email@example.com" }),
+                React.createElement(Input, { label: "パスワード", type: "password", value: password, onChange: e => setPassword(e.target.value), required: true, placeholder: "6文字以上" }),
+                error && React.createElement('p', { className: "text-red-500 text-sm text-center" }, error),
+                React.createElement(Button, { type: "submit", className: "w-full", disabled: loading }, loading ? "処理中..." : buttonText),
+                React.createElement('div', { className: "text-center mt-4" },
+                    React.createElement(Link, { to: linkTo, className: "text-sm text-blue-600 hover:underline dark:text-blue-400" }, linkText)
+                )
+            )
+        )
+    );
+};
+
+const LoginScreen = () => React.createElement(AuthForm, { isLogin: true });
+const SignupScreen = () => React.createElement(AuthForm, {});
+
 const InitialSetupScreen = ({ onComplete }) => {
     const { settings, saveSettings } = useAppContext();
     const [monthlyIncome, setMonthlyIncome] = useState(settings?.monthlyIncome || 300000);
@@ -291,19 +390,24 @@ const InitialSetupScreen = ({ onComplete }) => {
         setCategories(categories.filter(c => c.id !== id));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        saveSettings({ 
-            monthlyIncome, 
-            initialBalance, 
-            expenseCategories: categories,
-            summerBonus,
-            winterBonus,
-            summerBonusMonth,
-            winterBonusMonth,
-        });
-        alert('設定を保存しました。');
-        onComplete();
+        try {
+            await saveSettings({ 
+                monthlyIncome, 
+                initialBalance, 
+                expenseCategories: categories,
+                summerBonus,
+                winterBonus,
+                summerBonusMonth,
+                winterBonusMonth,
+            });
+            alert('設定を保存しました。');
+            onComplete();
+        } catch(error) {
+            console.error("Failed to save settings:", error);
+            alert("設定の保存に失敗しました。");
+        }
     };
 
     return (
@@ -325,7 +429,7 @@ const InitialSetupScreen = ({ onComplete }) => {
                         ))
                     ),
                     React.createElement('div', { className: "flex gap-2 mt-2" },
-                        React.createElement(Input, { label: "新しいカテゴリ名", type: "text", value: newCategoryName, onChange: e => setNewCategoryName(e.target.value) }),
+                        React.createElement(Input, { label: "新しいカテゴリ名", type: "text", value: newCategoryName, onChange: e => setNewCategoryName(e.target.value), placeholder: "例: 通信費" }),
                         React.createElement(Button, { onClick: addCategory, className: "mt-auto h-[42px]" }, React.createElement(PlusIcon))
                     )
                 ),
@@ -355,7 +459,7 @@ const InitialSetupScreen = ({ onComplete }) => {
 };
 
 const AnnualSetupScreen = () => {
-    const { settings, annualData, saveAnnualData } = useAppContext();
+    const { settings, allBudgets, saveAnnualSetup } = useAppContext();
     const navigate = useNavigate();
     const [year, setYear] = useState(new Date().getFullYear());
     const [currentData, setCurrentData] = useState(null);
@@ -363,61 +467,54 @@ const AnnualSetupScreen = () => {
 
     useEffect(() => {
         if (settings) {
-            const data = annualData[year];
-            if (data) {
-                setCurrentData(data);
+            const budgetData = allBudgets[year];
+            if (budgetData) {
+                setCurrentData(budgetData);
             } else {
                 const createInitialBudget = () => settings.expenseCategories.reduce((acc, cat) => ({...acc, [cat.id]: 0}), {});
-                const startingBalance = annualData[year-1]?.actualBalances[11] ?? settings.initialBalance;
+                const prevYearBudget = allBudgets[year - 1];
+                const startingBalance = prevYearBudget?.plannedBalance?.[11] ?? settings.initialBalance;
+                
                 setCurrentData({
-                    budget: {
-                        year,
-                        startingBalance,
-                        normalMonthBudget: createInitialBudget(),
-                        bonusMonthBudget: createInitialBudget(),
-                        plannedBalance: Array(12).fill(startingBalance)
-                    },
-                    transactions: [],
-                    actualBalances: Array(12).fill(null),
+                    startingBalance,
+                    normalMonthBudget: createInitialBudget(),
+                    bonusMonthBudget: createInitialBudget(),
+                    plannedBalance: Array(12).fill(startingBalance)
                 });
             }
         }
-    }, [year, annualData, settings]);
-
+    }, [year, allBudgets, settings]);
+    
     const handleBudgetChange = (type, categoryId, value) => {
         if (!currentData) return;
         const budgetKey = type === 'normal' ? 'normalMonthBudget' : 'bonusMonthBudget';
         setCurrentData({
             ...currentData,
-            budget: {
-                ...currentData.budget,
-                [budgetKey]: {
-                    ...currentData.budget[budgetKey],
-                    [categoryId]: parseFloat(value) || 0,
-                }
+            [budgetKey]: {
+                ...currentData[budgetKey],
+                [categoryId]: parseFloat(value) || 0,
             }
         });
     };
 
     const handlePlannedBalanceChange = (monthIndex, value) => {
         if (!currentData) return;
-        const newPlannedBalance = [...currentData.budget.plannedBalance];
+        const newPlannedBalance = [...currentData.plannedBalance];
         newPlannedBalance[monthIndex] = parseFloat(value) || 0;
-        setCurrentData({
-            ...currentData,
-            budget: {
-                ...currentData.budget,
-                plannedBalance: newPlannedBalance,
-            }
-        });
+        setCurrentData({ ...currentData, plannedBalance: newPlannedBalance });
     }
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (currentData) {
-            saveAnnualData(year, currentData);
-            alert(`${year}年の設定を保存しました。`);
-            navigate('/monthly');
+            try {
+                await saveAnnualSetup(year, currentData, Array(12).fill(null));
+                alert(`${year}年の設定を保存しました。`);
+                navigate('/monthly');
+            } catch (error) {
+                console.error("Failed to save annual settings:", error);
+                alert("年間設定の保存に失敗しました。");
+            }
         }
     };
 
@@ -437,7 +534,7 @@ const AnnualSetupScreen = () => {
                     React.createElement(Select, { label: "対象年", value: year, onChange: e => setYear(Number(e.target.value)), className: "w-full sm:w-48" },
                         years.map(y => React.createElement('option', { key: y, value: y }, `${y}年`))
                     ),
-                    React.createElement(Input, { label: "年初残高", type: "number", value: currentData.budget.startingBalance, onChange: e => setCurrentData({...currentData, budget: {...currentData.budget, startingBalance: parseFloat(e.target.value) || 0}}), className: "w-full sm:w-auto" })
+                    React.createElement(Input, { label: "年初残高", type: "number", value: currentData.startingBalance, onChange: e => setCurrentData({...currentData, startingBalance: parseFloat(e.target.value) || 0}), className: "w-full sm:w-auto" })
                 )
             ),
 
@@ -455,7 +552,7 @@ const AnnualSetupScreen = () => {
                             key: cat.id,
                             label: cat.name,
                             type: "number",
-                            value: currentData.budget[activeTab === 'normal' ? 'normalMonthBudget' : 'bonusMonthBudget'][cat.id] || 0,
+                            value: currentData[activeTab === 'normal' ? 'normalMonthBudget' : 'bonusMonthBudget'][cat.id] || 0,
                             onChange: e => handleBudgetChange(activeTab, cat.id, e.target.value)
                         })
                     ))
@@ -470,7 +567,7 @@ const AnnualSetupScreen = () => {
                             key: index,
                             label: `${name}末`,
                             type: "number",
-                            value: currentData.budget.plannedBalance[index] || 0,
+                            value: currentData.plannedBalance[index] || 0,
                             onChange: e => handlePlannedBalanceChange(index, e.target.value)
                         })
                     ))
@@ -500,11 +597,11 @@ const SetupScreen = () => {
 };
 
 const ProtectedRoute = ({ children }) => {
-    const { settings, annualData } = useAppContext();
+    const { settings, allBudgets } = useAppContext();
     const location = useLocation();
 
-    const hasAnnualData = annualData && Object.keys(annualData).length > 0;
-    const isFullySetup = !!settings && hasAnnualData;
+    const hasBudgetData = allBudgets && Object.keys(allBudgets).length > 0;
+    const isFullySetup = !!settings && hasBudgetData;
 
     if (!isFullySetup) {
         return React.createElement(Navigate, { to: "/setup", state: { from: location }, replace: true });
@@ -513,8 +610,100 @@ const ProtectedRoute = ({ children }) => {
     return children;
 };
 
+const AiAdvisor = ({ year, month, transactions, budget, settings }) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [advice, setAdvice] = useState('');
+
+    const generatePrompt = () => {
+        const expensesByCategory = transactions
+            .filter(tx => tx.type === 'expense' && tx.categoryId)
+            .reduce((acc, tx) => {
+                acc[tx.categoryId] = (acc[tx.categoryId] || 0) + tx.amount;
+                return acc;
+            }, {});
+
+        const totalBudget = budget ? Object.values(budget).reduce((a, b) => a + b, 0) : 0;
+        const totalExpense = Object.values(expensesByCategory).reduce((a, b) => a + b, 0);
+
+        let prompt = `あなたは経験豊富なファイナンシャルプランナーです。以下の家計データに基づき、ユーザーが実行可能で具体的な節約アドバイスを3つ、日本語で提案してください。フレンドリーな口調で、なぜその提案が有効なのか理由も添えてください。\n\n`;
+        prompt += `# 家計データ (${year}年${month + 1}月)\n\n`;
+        prompt += `## 支出サマリー\n`;
+        prompt += `- 予算合計: ${formatCurrency(totalBudget)}\n`;
+        prompt += `- 支出合計: ${formatCurrency(totalExpense)}\n`;
+        prompt += `- 差額: ${formatCurrency(totalBudget - totalExpense)}\n\n`;
+        prompt += `## カテゴリ別支出 (実績 / 予算)\n`;
+        settings.expenseCategories.forEach(cat => {
+            const expense = expensesByCategory[cat.id] || 0;
+            const catBudget = budget?.[cat.id] || 0;
+            prompt += `- ${cat.name}: ${formatCurrency(expense)} / ${formatCurrency(catBudget)}\n`;
+        });
+
+        prompt += `\n# アドバイス\n`;
+        return prompt;
+    };
+
+    const handleGenerateAdvice = async () => {
+        if (!process.env.API_KEY) {
+            alert("APIキーが設定されていません。");
+            return;
+        }
+        setIsModalOpen(true);
+        setIsLoading(true);
+        setAdvice('');
+
+        const prompt = generatePrompt();
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                 config: {
+                    temperature: 0.7,
+                    topP: 0.9,
+                }
+            });
+            setAdvice(response.text);
+        } catch (error) {
+            console.error("AI advice generation failed:", error);
+            setAdvice("申し訳ありません、アドバイスの生成中にエラーが発生しました。しばらくしてから再度お試しください。");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    const formattedAdvice = useMemo(() => {
+        if (!advice) return null;
+        return advice.split('\n').map((line, index) => {
+            if (line.startsWith('* ') || line.startsWith('- ')) {
+                return React.createElement('li', { key: index, className: 'ml-4' }, line.substring(2));
+            }
+            if(line.trim().length === 0){
+                return React.createElement('br', { key: index });
+            }
+            return React.createElement('p', { key: index, className: 'mb-2' }, line);
+        });
+    }, [advice]);
+
+    return React.createElement(React.Fragment, null,
+        React.createElement(Button, { onClick: handleGenerateAdvice, className: "bg-purple-600 hover:bg-purple-700", disabled: isLoading },
+            React.createElement(LightBulbIcon), "AI節約アドバイス"
+        ),
+        React.createElement(Modal, { isOpen: isModalOpen, onClose: () => setIsModalOpen(false), title: "AI節約アドバイス" },
+            isLoading ? (
+                React.createElement('div', { className: "flex flex-col items-center justify-center p-8" },
+                    React.createElement('div', { className: "animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500" }),
+                    React.createElement('p', { className: "mt-4 text-lg" }, "アドバイスを生成中...")
+                )
+            ) : (
+                React.createElement('div', { className: "text-gray-700 dark:text-gray-300" }, formattedAdvice)
+            )
+        )
+    );
+};
+
 const MonthlyTrackerScreen = () => {
-    const { settings, annualData, addTransaction, updateTransaction, deleteTransaction } = useAppContext();
+    const { settings, allBudgets, allTransactions, addTransaction, updateTransaction, deleteTransaction } = useAppContext();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTx, setEditingTx] = useState(null);
@@ -531,20 +720,19 @@ const MonthlyTrackerScreen = () => {
     const [incomeSource, setIncomeSource] = useState('salary');
 
     const year = currentDate.getFullYear();
-    const month = currentDate.getMonth(); // 0-11
+    const month = currentDate.getMonth();
     
-    const yearData = annualData[year];
+    const budgetData = allBudgets[year];
 
     const isBonusMonth = settings && (month + 1 === settings.summerBonusMonth || month + 1 === settings.winterBonusMonth);
-    const budget = yearData?.budget?.[isBonusMonth ? 'bonusMonthBudget' : 'normalMonthBudget'];
+    const budget = budgetData?.[isBonusMonth ? 'bonusMonthBudget' : 'normalMonthBudget'];
     const totalBudget = budget ? Object.values(budget).reduce((sum, val) => sum + val, 0) : 0;
     
-    const monthlyTransactions = useMemo(() => 
-        yearData?.transactions.filter(tx => {
-            const txDate = new Date(tx.date);
-            return txDate.getUTCFullYear() === year && txDate.getUTCMonth() === month;
-        }) || [], 
-    [yearData, year, month]);
+    const monthlyTransactions = useMemo(() => {
+        const startOfMonth = new Date(Date.UTC(year, month, 1)).toISOString().split('T')[0];
+        const endOfMonth = new Date(Date.UTC(year, month + 1, 0)).toISOString().split('T')[0];
+        return allTransactions.filter(tx => tx.date >= startOfMonth && tx.date <= endOfMonth);
+    }, [allTransactions, year, month]);
     
     const expensesByCategory = useMemo(() => 
         monthlyTransactions
@@ -589,13 +777,18 @@ const MonthlyTrackerScreen = () => {
         setIsModalOpen(true);
     };
     
-    const handleDeleteTransaction = (transactionId) => {
+    const handleDeleteTransaction = async (transactionId) => {
         if (window.confirm('この取引を削除しますか？')) {
-            deleteTransaction(year, transactionId);
+            try {
+                await deleteTransaction(transactionId);
+            } catch (error) {
+                console.error("Failed to delete transaction:", error);
+                alert("取引の削除に失敗しました。");
+            }
         }
     };
     
-    const handleSaveTransaction = () => {
+    const handleSaveTransaction = async () => {
         const amount = Number(newTx.amount) || 0;
         if (amount <= 0 || (newTx.type === 'expense' && !newTx.categoryId)) {
             alert('有効な金額とカテゴリを入力してください。');
@@ -608,22 +801,23 @@ const MonthlyTrackerScreen = () => {
              else if (incomeSource === 'bonus') description = '賞与';
         }
 
-        const transactionData = {
-            ...newTx,
-            id: editingTx ? editingTx.id : `tx${Date.now()}`,
-            amount: amount,
-            description: description,
-        };
-
-        if(editingTx) {
-            updateTransaction(year, transactionData);
-        } else {
-            addTransaction(year, transactionData);
+        const transactionData = { ...newTx, amount, description };
+        
+        try {
+            if (editingTx) {
+                const { id, ...txToUpdate } = transactionData;
+                await updateTransaction(editingTx.id, txToUpdate);
+            } else {
+                await addTransaction(transactionData);
+            }
+            setIsModalOpen(false);
+        } catch(error) {
+            console.error("Failed to save transaction:", error);
+            alert("取引の保存に失敗しました。");
         }
-        setIsModalOpen(false);
     };
 
-    if (!settings || !yearData) {
+    if (!settings || !budgetData) {
         return (
             React.createElement(PageWrapper, { title: "月次記録" },
                 React.createElement(Card, null, 
@@ -637,13 +831,16 @@ const MonthlyTrackerScreen = () => {
     
     return (
         React.createElement(PageWrapper, { title: "月次記録" },
-            React.createElement('div', { className: "flex justify-between items-center mb-6" },
-                React.createElement('div', { className: "flex gap-2" },
+            React.createElement('div', { className: "flex flex-wrap justify-between items-center mb-6 gap-4" },
+                React.createElement('div', { className: "flex gap-2 items-center" },
                     React.createElement(Button, { onClick: () => setCurrentDate(new Date(year, month - 1)) }, "< 前月"),
                     React.createElement('h3', { className: "text-2xl font-bold p-2" }, `${year}年 ${MONTH_NAMES[month]}`),
                     React.createElement(Button, { onClick: () => setCurrentDate(new Date(year, month + 1)) }, "次月 >")
                 ),
-                React.createElement(Button, { onClick: handleOpenAddModal }, React.createElement(PlusIcon), "収支を追加")
+                React.createElement('div', { className: "flex gap-2" },
+                    React.createElement(AiAdvisor, { year, month, transactions: monthlyTransactions, budget, settings }),
+                    React.createElement(Button, { onClick: handleOpenAddModal }, React.createElement(PlusIcon), "収支を追加")
+                )
             ),
 
             React.createElement(Card, { className: "mb-6" },
@@ -735,39 +932,31 @@ const MonthlyTrackerScreen = () => {
 };
 
 const AnnualSummaryScreen = () => {
-    const { settings, annualData, updateActualBalance } = useAppContext();
+    const { settings, allBudgets, allTransactions, allActualBalances, updateActualBalance } = useAppContext();
     const [year, setYear] = useState(new Date().getFullYear());
     
-    const yearData = annualData[year];
+    const availableYears = Object.keys(allBudgets).map(Number).sort((a,b) => b-a);
+    const budgetData = allBudgets[year];
+    const actualBalances = allActualBalances[year] || Array(12).fill(null);
 
     useEffect(() => {
-        // If the selected year has no data, try to select the latest year that has data.
-        if (!yearData) {
-            const availableYears = Object.keys(annualData).map(Number).sort((a,b) => b-a);
-            if (availableYears.length > 0) {
-                setYear(availableYears[0]);
-            }
+        if (!budgetData && availableYears.length > 0) {
+            setYear(availableYears[0]);
         }
-    }, [year, yearData, annualData]);
+    }, [year, budgetData, availableYears]);
 
     const summaryData = useMemo(() => {
-        if (!settings || !yearData) return [];
+        if (!settings || !budgetData) return [];
 
-        let runningBalance = yearData.budget.startingBalance;
+        let runningBalance = budgetData.startingBalance;
 
         return MONTH_NAMES.map((monthName, i) => {
-            const monthlyTransactions = yearData.transactions.filter(tx => {
-                const txDate = new Date(tx.date);
-                return txDate.getUTCFullYear() === year && txDate.getUTCMonth() === i;
-            });
-
-            const income = monthlyTransactions
-                .filter(tx => tx.type === 'income')
-                .reduce((sum, tx) => sum + tx.amount, 0);
-
-            const expense = monthlyTransactions
-                .filter(tx => tx.type === 'expense')
-                .reduce((sum, tx) => sum + tx.amount, 0);
+            const startOfMonth = new Date(Date.UTC(year, i, 1)).toISOString().split('T')[0];
+            const endOfMonth = new Date(Date.UTC(year, i + 1, 0)).toISOString().split('T')[0];
+            const monthlyTransactions = allTransactions.filter(tx => tx.date >= startOfMonth && tx.date <= endOfMonth);
+            
+            const income = monthlyTransactions.filter(tx => tx.type === 'income').reduce((sum, tx) => sum + tx.amount, 0);
+            const expense = monthlyTransactions.filter(tx => tx.type === 'expense').reduce((sum, tx) => sum + tx.amount, 0);
             
             runningBalance += income - expense;
 
@@ -777,26 +966,24 @@ const AnnualSummaryScreen = () => {
                 income,
                 expense,
                 calculatedBalance: runningBalance,
-                actualBalance: yearData.actualBalances[i],
-                plannedBalance: yearData.budget.plannedBalance[i]
+                actualBalance: actualBalances[i],
+                plannedBalance: budgetData.plannedBalance[i]
             };
         });
 
-    }, [settings, yearData, year]);
+    }, [settings, budgetData, allTransactions, actualBalances, year]);
 
 
     const handleActualBalanceChange = (monthIndex, value) => {
-        if (value === '') {
-            updateActualBalance(year, monthIndex, null);
-            return;
+        const balance = value === '' ? null : parseFloat(value);
+        if (value !== '' && isNaN(balance)) {
+             return;
         }
-        const balance = parseFloat(value);
-        if (!isNaN(balance)) {
-            updateActualBalance(year, monthIndex, balance);
-        }
+        updateActualBalance(year, monthIndex, balance).catch(error => {
+            console.error("Failed to update actual balance:", error);
+            alert("実績残高の更新に失敗しました。");
+        });
     };
-
-    const availableYears = Object.keys(annualData).map(Number).sort((a,b) => b-a);
 
     if (!settings || availableYears.length === 0) {
         return (
@@ -805,9 +992,12 @@ const AnnualSummaryScreen = () => {
             )
         );
     }
-     if (!yearData) {
+     if (!budgetData) {
         return (
             React.createElement(PageWrapper, { title: "年間集計" },
+                 React.createElement(Select, { label: "対象年", value: year, onChange: e => setYear(Number(e.target.value)), className: "w-48 mb-4" },
+                    availableYears.map(y => React.createElement('option', { key: y, value: y }, `${y}年`))
+                ),
                 React.createElement(Card, null, React.createElement('p', null, `${year}年のデータがありません。 `, React.createElement(NavLink, { to: "/setup", className: "text-blue-500 hover:underline" }, "設定画面"), "で追加してください。"))
             )
         );
@@ -894,57 +1084,63 @@ const AnnualSummaryScreen = () => {
                     )
                 )
             )
-
         )
     );
 };
 
+const AppShell = () => {
+    const { settings, allBudgets, loading } = useAppContext();
+    const hasBudgetData = allBudgets && Object.keys(allBudgets).length > 0;
+    const isFullySetup = !!settings && hasBudgetData;
 
-const AppRoutes = () => {
-    const { settings, annualData } = useAppContext();
-    const hasAnnualData = annualData && Object.keys(annualData).length > 0;
-    const isFullySetup = !!settings && hasAnnualData;
+    if (loading) {
+        return React.createElement('div', {className: "flex justify-center items-center h-screen"}, React.createElement('p', null, "データを読み込み中..."));
+    }
 
-    return (
-        React.createElement(Routes, null,
-            React.createElement(Route, { path: "/setup", element: React.createElement(SetupScreen) }),
-            React.createElement(Route, { 
-                path: "/monthly", 
-                element:
-                    React.createElement(ProtectedRoute, null,
-                        React.createElement(MonthlyTrackerScreen)
-                    )
-            }),
-            React.createElement(Route, { 
-                path: "/summary", 
-                element:
-                    React.createElement(ProtectedRoute, null,
-                        React.createElement(AnnualSummaryScreen)
-                    )
-            }),
-            React.createElement(Route, { 
-                path: "/", 
-                element: React.createElement(Navigate, { to: isFullySetup ? "/monthly" : "/setup", replace: true })
-            }),
-            React.createElement(Route, { path: "*", element: React.createElement(PageWrapper, { title: "ページが見つかりません" }, React.createElement(Card, null, React.createElement('p', null, "お探しのページは見つかりませんでした。"))) })
-        )
-    );
-};
-
-const MainApp = () => {
     return (
         React.createElement('div', { className: "min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100" },
             React.createElement(Header),
-            React.createElement(AppRoutes)
+            React.createElement(Routes, null,
+                React.createElement(Route, { path: "/setup", element: React.createElement(SetupScreen) }),
+                React.createElement(Route, { path: "/monthly", element: React.createElement(ProtectedRoute, null, React.createElement(MonthlyTrackerScreen)) }),
+                React.createElement(Route, { path: "/summary", element: React.createElement(ProtectedRoute, null, React.createElement(AnnualSummaryScreen)) }),
+                React.createElement(Route, { path: "/", element: React.createElement(Navigate, { to: isFullySetup ? "/monthly" : "/setup", replace: true }) }),
+                React.createElement(Route, { path: "*", element: React.createElement(PageWrapper, { title: "ページが見つかりません" }, React.createElement(Card, null, React.createElement('p', null, "お探しのページは見つかりませんでした。"))) })
+            )
         )
-    )
-}
+    );
+};
+
+const RequireAuth = ({ children }) => {
+    const { currentUser, loading } = useAuth();
+    const location = useLocation();
+
+    if (loading) {
+        return React.createElement('div', {className: "flex justify-center items-center h-screen"}, React.createElement('p', null, "認証情報を確認中..."));
+    }
+
+    if (!currentUser) {
+        return React.createElement(Navigate, { to: "/login", state: { from: location }, replace: true });
+    }
+
+    return children;
+};
 
 const App = () => {
   return (
-    React.createElement(AppContextProvider, null,
-        React.createElement(HashRouter, null,
-            React.createElement(MainApp)
+    React.createElement(HashRouter, null,
+        React.createElement(AuthProvider, null,
+            React.createElement(Routes, null,
+                React.createElement(Route, { path: "/login", element: React.createElement(LoginScreen) }),
+                React.createElement(Route, { path: "/signup", element: React.createElement(SignupScreen) }),
+                React.createElement(Route, { path: "/*", element:
+                    React.createElement(RequireAuth, null, 
+                        React.createElement(AppContextProvider, null,
+                            React.createElement(AppShell)
+                        )
+                    )
+                })
+            )
         )
     )
   );
