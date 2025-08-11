@@ -1,6 +1,3 @@
-// 重要：このファイルは、あなたのFirebaseプロジェクトの設定に置き換える必要があります。
-// Firebaseコンソールのプロジェクト設定ページから、ウェブアプリのFirebase設定オブジェクトを取得して貼り付けてください。
-
 // 環境変数からFirebaseの設定を読み込みます。
 // ローカルでの開発時は、プロジェクトルートの`.env`ファイルから読み込まれます。
 // GitHub Actionsでのデプロイ時は、GitHubのSecretsから読み込まれます。
@@ -14,9 +11,11 @@ const firebaseConfig = {
 };
 
 // Firebaseの初期化
-if (!firebase.apps.length) {
+// index.htmlで読み込まれたグローバルなfirebaseオブジェクトを使用します
+if (typeof firebase !== 'undefined' && !firebase.apps.length) {
   firebase.initializeApp(firebaseConfig);
 }
 
+// 初期化後に各サービスをエクスポート
 export const auth = firebase.auth();
 export const db = firebase.firestore();
