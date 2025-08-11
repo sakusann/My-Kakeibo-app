@@ -644,7 +644,7 @@ const AiAdvisor = ({ year, month, transactions, budget, settings }) => {
     };
 
     const handleGenerateAdvice = async () => {
-        if (!process.env.API_KEY) {
+        if (!process.env.REACT_APP_GEMINI_API_KEY) {
             alert("APIキーが設定されていません。");
             return;
         }
@@ -654,7 +654,7 @@ const AiAdvisor = ({ year, month, transactions, budget, settings }) => {
 
         const prompt = generatePrompt();
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: process.env.REACT_APP_GEMINI_API_KEY });
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: prompt,
