@@ -14,6 +14,17 @@ export const AppContextProvider = ({ children }) => {
   const [appData, setAppData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [geminiApiKey, setGeminiApiKey] = useState(null); // APIキーを管理するstate
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -49,8 +60,7 @@ export const AppContextProvider = ({ children }) => {
         setAppData(docSnap.data());
       } else {
         setAppData({ settings: null, annualData: {} });
-      }
-      setLoading(false);
+      } setLoading(false);
     }, (error) => {
       console.error("Firestoreのデータ取得に失敗:", error);
       setLoading(false);
@@ -58,6 +68,10 @@ export const AppContextProvider = ({ children }) => {
 
     return () => unsubscribe();
   }, [currentUser]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
+  }, []);
 
 // AppContext.jsx の中の saveSettings 関数
   const saveSettings = useCallback(async (newSettings) => {
@@ -122,6 +136,8 @@ export const AppContextProvider = ({ children }) => {
     annualData: appData?.annualData || {},
     loading,
     geminiApiKey, // ★追加
+    theme,
+    toggleTheme,
     saveSettings,
     saveAnnualData,
     saveTransaction,

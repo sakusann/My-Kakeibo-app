@@ -1,58 +1,61 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { auth } from '../firebase/config'; // 以前作成したconfigファイルをインポート
-import {
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut,
-} from 'firebase/auth';
+import { auth } from '../lib/firebase';
+import { onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { User } from '../lib/types';
 
-// 1. Contextオブジェクトを作成
-const AuthContext = createContext();
+// Define the type for the context value
+interface AuthContextType {
+  currentUser: User | null;
+  loading: boolean;
+  onGoogleSignIn: () => Promise<void>;
+  onSignOut: () => Promise<void>;
+}
 
-// 2. 他のコンポーネントでContextを簡単に使えるようにするためのカスタムフック
+const AuthContext = createContext<AuthContextType | null>(null);
+
 export const useAuth = () => {
   return useContext(AuthContext);
 };
 
-// 3. Contextの機能を提供するプロバイダーコンポーネント
 export const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true); // 認証状態を確認中かどうかのフラグ
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // ログイン・サインアップ・ログアウト関数を定義
-  const signup = (email, password) => {
-    return createUserWithEmailAndPassword(auth, email, password);
+  const onGoogleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error("Google Sign-In Error:", error);
+      alert("Googleログインに失敗しました。");
+    }
   };
 
-  const login = (email, password) => {
-    return signInWithEmailAndPassword(auth, email, password);
+  const onSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Sign-Out Error:", error);
+      alert("ログアウトに失敗しました。");
+    }
   };
 
-  const logout = () => {
-    return signOut(auth);
-  };
-
-  // 最初に一度だけ実行し、Firebaseの認証状態の変更を監視する
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      setLoading(false); // 確認が完了したらローディングを解除
+      setCurrentUser(user as User);
+      setLoading(false);
     });
 
-    return unsubscribe; // コンポーネントが不要になったら監視を解除
+    return unsubscribe;
   }, []);
 
-  // Contextで提供する値
   const value = {
     currentUser,
     loading,
-    signup,
-    login,
-    logout,
+    onGoogleSignIn,
+    onSignOut,
   };
 
-  // ローディング中でなければ、子コンポーネントを表示
   return (
     <AuthContext.Provider value={value}>
       {!loading && children}
