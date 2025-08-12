@@ -22,7 +22,7 @@ jobs:
       # 3. Reactアプリの依存関係をインストールし、ビルド
       - name: Install and Build
         run: |
-          cd build\frontend
+          cd frontend
           npm ci
           npm run build
 
