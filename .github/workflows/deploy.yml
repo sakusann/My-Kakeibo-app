@@ -35,3 +35,4 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_MY_KAKEIBO_APP_12337 }}'
           projectId: 'my-kakeibo-app-12337'
           # projectId: 'your-firebase-project-id' # .firebasercがあれば不要な場合が多いですが、指定するとより確実です
+          channelId: 'live' # デフォルトのチャンネルIDを指定（必要に応じて変更可能）
