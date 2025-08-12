@@ -1,31 +1,48 @@
-import React, { useState, useEffect } from 'react';
-import { auth } from './firebase/config';
-import { onAuthStateChanged } from 'firebase/auth';
-import Auth from './components/Auth.jsx'; // 作成したAuthコンポーネントをインポート
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { AppContextProvider } from './context/AppContext'; // ★インポート
+
+// Layouts
+import AppLayout from './layouts/AppLayout';
+
+// Screens
+import LoginScreen from './screens/LoginScreen';
+import SignupScreen from './screens/SignupScreen';
+import MonthlyTrackerScreen from './screens/MonthlyTrackerScreen';
+import AnnualSummaryScreen from './screens/AnnualSummaryScreen';
+import SettingsScreen from './screens/SettingsScreen';
+
+
+const RequireAuth = () => {
+  const { currentUser } = useAuth();
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
+  // 認証済みの場合、子コンポーネントがAppコンテキストを使えるように囲む
+  return (
+    <AppContextProvider>
+      <AppLayout />
+    </AppContextProvider>
+  );
+};
 
 function App() {
-  const [user, setUser] = useState(null); // ログイン状態を管理
-
-  // ログイン状態の変化を監視する
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser); // ユーザー情報をセット
-    });
-    return () => unsubscribe(); // クリーンアップ
-  }, []);
-
   return (
-    <div className="App">
-      <h1>My Kakeibo App</h1>
-      {user ? (
-        <div>
-          <p>ようこそ、{user.email} さん</p>
-          {/* ここにログイン後のメインコンテンツ（取引フォームや一覧）が入る */}
-        </div>
-      ) : (
-        <Auth /> // ログインしていない場合は認証コンポーネントを表示
-      )}
-    </div>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginScreen />} />
+          <Route path="/signup" element={<SignupScreen />} />
+          <Route path="/" element={<RequireAuth />}>
+            <Route path="monthly" element={<MonthlyTrackerScreen />} />
+            <Route path="summary" element={<AnnualSummaryScreen />} />
+            <Route path="settings" element={<SettingsScreen />} />
+            <Route index element={<Navigate to="/monthly" replace />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 
