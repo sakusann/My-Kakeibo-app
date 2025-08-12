@@ -19,20 +19,16 @@ jobs:
         with:
           node-version: '20' # プロジェクトで使用しているNode.jsのバージョンを指定
 
-      # 3. Reactアプリの依存関係をインストールし、ビルド
+# 3. Reactアプリの依存関係をインストールし、ビルド
       - name: Install and Build
         run: |
           cd frontend
           npm ci
           npm run build
-
-      # 4. Firebase Hostingへデプロイ
-      - name: Deploy to Firebase
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseToken: '${{ secrets.FIREBASE_TOKEN }}' # ステップ3で設定したSecretを読み込む
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_MY_KAKEIBO_APP_12337 }}'
-          projectId: 'my-kakeibo-app-12337'
-          # projectId: 'your-firebase-project-id' # .firebasercがあれば不要な場合が多いですが、指定するとより確実です
-          channelId: 'live' # デフォルトのチャンネルIDを指定（必要に応じて変更可能）
+        env: # このenvブロックを丸ごと追加してください
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
