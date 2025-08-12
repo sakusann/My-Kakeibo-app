@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth } from './firebase/config';
 import { onAuthStateChanged } from 'firebase/auth';
-import Auth from './components/Auth'; // 作成したAuthコンポーネントをインポート
+import Auth from './components/Auth.jsx'; // 作成したAuthコンポーネントをインポート
 
 function App() {
   const [user, setUser] = useState(null); // ログイン状態を管理
