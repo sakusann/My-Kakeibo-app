@@ -1,10 +1,12 @@
-
 import React, { useState, useEffect, useContext, createContext, useCallback, useMemo } from 'react';
 import { HashRouter, Routes, Route, NavLink, useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { GoogleGenAI } from '@google/genai';
 import { MONTH_NAMES } from './constants.js';
 import { auth, db } from './firebase.js';
+import { GoogleGenAI, Type } from "@google/genai";
+
+// --- AI SETUP ---
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- UTILS ---
 const formatCurrency = (amount) => {
@@ -18,7 +20,7 @@ const PencilIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/
 const ChartBarIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-6 w-6", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M3 13h2v7H3v-7zm4 5h2v2H7v-2zm4-10h2v12h-2V8zm4 5h2v7h-2v-7zm4-3h2v10h-2V10z" }));
 const CalendarIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-6 w-6", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H4V8h16v13z" }));
 const CogIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-6 w-6", viewBox: "0 0 24 24", fill: "currentColor" }, React.createElement('path', { d: "M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49 1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61.22l2-3.46c.12-.22-.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z" }));
-const LightBulbIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", viewBox: "0 0 20 20", fill: "currentColor" }, React.createElement('path', { d: "M10 2a6 6 0 00-6 6c0 3.31 1.67 6.22 4.2 7.72.32.18.5.52.5.88v1.4h2.6v-1.4c0-.36.18-.7.5-.88C14.33 14.22 16 11.31 16 8a6 6 0 00-6-6zm1.75 13h-3.5a.75.75 0 010-1.5h3.5a.75.75 0 010 1.5z" }));
+const SparklesIcon = () => React.createElement('svg', { xmlns: "http://www.w3.org/2000/svg", className: "h-5 w-5", viewBox: "0 0 20 20", fill: "currentColor" }, React.createElement('path', { fillRule: "evenodd", d: "M5 2a1 1 0 00-1 1v1.586l-1.293 1.293a1 1 0 001.414 1.414L5 6.414V8a1 1 0 002 0V6.414l.879.879a1 1 0 001.414-1.414L8 4.586V3a1 1 0 00-1-1H5zM3 10a1 1 0 011-1h1.586l1.293-1.293a1 1 0 011.414 1.414L7.586 10H9a1 1 0 010 2H7.586l-.707.707a1 1 0 01-1.414-1.414L6.586 11H4a1 1 0 01-1-1zM10 5a1 1 0 011 1v1.586l1.293-1.293a1 1 0 111.414 1.414L13.586 7H15a1 1 0 110 2h-1.414l-.879.879a1 1 0 11-1.414-1.414L12 7.586V6a1 1 0 01-1-1zM11.121 12.879a1 1 0 011.414 0l.707.707H15a1 1 0 110 2h-1.758l-.707.707a1 1 0 01-1.414-1.414l.707-.707-1.293-1.293a1 1 0 010-1.414z", clipRule: "evenodd" }));
 
 // --- CONTEXTS ---
 const AuthContext = createContext(null);
@@ -48,111 +50,79 @@ const AuthProvider = ({ children }) => {
 const AppContext = createContext(null);
 
 const AppContextProvider = ({ children }) => {
-    const [settings, setSettings] = useState(null);
-    const [allBudgets, setAllBudgets] = useState({});
-    const [allTransactions, setAllTransactions] = useState([]);
-    const [allActualBalances, setAllActualBalances] = useState({});
+    const [state, setState] = useState({ settings: null, annualData: {} });
     const [loading, setLoading] = useState(true);
     const { currentUser } = useAuth();
 
-    const userRef = useMemo(() => currentUser ? db.collection('users').doc(currentUser.uid) : null, [currentUser]);
+    const userDocRef = useMemo(() => currentUser ? db.collection('users').doc(currentUser.uid) : null, [currentUser]);
 
     useEffect(() => {
-        if (!userRef) {
-            setSettings(null);
-            setAllBudgets({});
-            setAllTransactions([]);
-            setAllActualBalances({});
+        if (!userDocRef) {
+            setState({ settings: null, annualData: {} });
             setLoading(false);
             return;
         }
 
         setLoading(true);
-        const unsubscribeSettings = userRef.onSnapshot(doc => {
-            setSettings(doc.exists ? doc.data().settings : null);
+        const unsubscribe = userDocRef.onSnapshot(doc => {
+            if (doc.exists) {
+                setState(doc.data());
+            } else {
+                setState({ settings: null, annualData: {} });
+            }
+            setLoading(false);
+        }, error => {
+            console.error("Error fetching user data:", error);
             setLoading(false);
         });
 
-        const unsubscribeBudgets = userRef.collection('budgets').onSnapshot(snapshot => {
-            const budgetsData = {};
-            snapshot.forEach(doc => {
-                budgetsData[doc.id] = doc.data();
-            });
-            setAllBudgets(budgetsData);
-        });
+        return () => unsubscribe();
+    }, [userDocRef]);
 
-        const unsubscribeTransactions = userRef.collection('transactions').orderBy('date', 'desc').onSnapshot(snapshot => {
-            const transactionsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setAllTransactions(transactionsData);
-        });
-        
-        const unsubscribeActualBalances = userRef.collection('actualBalances').onSnapshot(snapshot => {
-            const balancesData = {};
-            snapshot.forEach(doc => {
-                 balancesData[doc.id] = doc.data().balances;
-            });
-            setAllActualBalances(balancesData);
-        });
+    const saveSettings = useCallback(async (settings) => {
+        if (!userDocRef) return Promise.reject("User not authenticated");
+        await userDocRef.set({ settings }, { merge: true });
+    }, [userDocRef]);
 
+    const saveAnnualData = useCallback(async (year, data) => {
+        if (!userDocRef) return Promise.reject("User not authenticated");
+        await userDocRef.update({ [`annualData.${year}`]: data });
+    }, [userDocRef]);
 
-        return () => {
-            unsubscribeSettings();
-            unsubscribeBudgets();
-            unsubscribeTransactions();
-            unsubscribeActualBalances();
-        };
-    }, [userRef]);
+    const addTransaction = useCallback(async (year, transaction) => {
+        if (!userDocRef) return Promise.reject("User not authenticated");
+        const yearData = state.annualData[year];
+        if (!yearData) return Promise.reject("Annual data for year not found");
+        const newTransactions = [...yearData.transactions, transaction].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        await userDocRef.update({ [`annualData.${year}.transactions`]: newTransactions });
+    }, [userDocRef, state.annualData]);
 
-    const saveSettings = useCallback(async (newSettings) => {
-        if (!userRef) return Promise.reject("User not authenticated");
-        await userRef.set({ settings: newSettings }, { merge: true });
-    }, [userRef]);
+    const updateTransaction = useCallback(async (year, updatedTx) => {
+        if (!userDocRef) return Promise.reject("User not authenticated");
+        const yearData = state.annualData[year];
+        if (!yearData) return Promise.reject("Annual data for year not found");
+        const newTransactions = yearData.transactions.map(tx => tx.id === updatedTx.id ? updatedTx : tx).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        await userDocRef.update({ [`annualData.${year}.transactions`]: newTransactions });
+    }, [userDocRef, state.annualData]);
 
-    const saveAnnualSetup = useCallback(async (year, budgetData, balancesData) => {
-        if (!userRef) return Promise.reject("User not authenticated");
-        const budgetRef = userRef.collection('budgets').doc(String(year));
-        const actualBalanceRef = userRef.collection('actualBalances').doc(String(year));
-        await budgetRef.set(budgetData);
-        await actualBalanceRef.set({ balances: balancesData });
-    }, [userRef]);
-
-    const addTransaction = useCallback(async (transaction) => {
-        if (!userRef) return Promise.reject("User not authenticated");
-        await userRef.collection('transactions').add(transaction);
-    }, [userRef]);
-
-    const updateTransaction = useCallback(async (transactionId, updatedTx) => {
-        if (!userRef) return Promise.reject("User not authenticated");
-        await userRef.collection('transactions').doc(transactionId).update(updatedTx);
-    }, [userRef]);
-
-    const deleteTransaction = useCallback(async (transactionId) => {
-        if (!userRef) return Promise.reject("User not authenticated");
-        await userRef.collection('transactions').doc(transactionId).delete();
-    }, [userRef]);
+    const deleteTransaction = useCallback(async (year, transactionId) => {
+        if (!userDocRef) return Promise.reject("User not authenticated");
+        const yearData = state.annualData[year];
+        if (!yearData) return Promise.reject("Annual data for year not found");
+        const newTransactions = yearData.transactions.filter(tx => tx.id !== transactionId);
+        await userDocRef.update({ [`annualData.${year}.transactions`]: newTransactions });
+    }, [userDocRef, state.annualData]);
 
     const updateActualBalance = useCallback(async (year, month, balance) => {
-        if (!userRef) return Promise.reject("User not authenticated");
-        const newBalances = [...(allActualBalances[year] || Array(12).fill(null))];
-        newBalances[month] = balance;
-        await userRef.collection('actualBalances').doc(String(year)).set({ balances: newBalances });
-    }, [userRef, allActualBalances]);
+        if (!userDocRef) return Promise.reject("User not authenticated");
+        const yearData = state.annualData[year];
+        if (!yearData) return Promise.reject("Annual data for year not found");
+        const newActualBalances = [...yearData.actualBalances];
+        newActualBalances[month] = balance;
+        await userDocRef.update({ [`annualData.${year}.actualBalances`]: newActualBalances });
+    }, [userDocRef, state.annualData]);
 
-    const value = {
-        settings,
-        allBudgets,
-        allTransactions,
-        allActualBalances,
-        loading,
-        saveSettings,
-        saveAnnualSetup,
-        addTransaction,
-        updateTransaction,
-        deleteTransaction,
-        updateActualBalance,
-    };
-
-    return React.createElement(AppContext.Provider, { value }, children);
+    return React.createElement(AppContext.Provider, { value: { ...state, loading, saveSettings, saveAnnualData, addTransaction, updateTransaction, deleteTransaction, updateActualBalance } }, children);
 };
 
 const useAppContext = () => {
@@ -190,7 +160,7 @@ const Input = ({ label, type, value, onChange, className = '', required = false,
       step: step,
       min: min,
       placeholder: placeholder,
-      className: "w-full px-3 py-2 text-gray-900 bg-gray-50 dark:bg-gray-700 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+      className: "w-full px-3 py-2 text-gray-900 bg-gray-50 dark:bg-gray-700 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
     })
   )
 );
@@ -198,7 +168,7 @@ const Input = ({ label, type, value, onChange, className = '', required = false,
 const Select = ({label, value, onChange, children, className, required}) => (
     React.createElement('div', { className: `w-full ${className}`},
         React.createElement('label', { className: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" }, label),
-        React.createElement('select', { value: value, onChange: onChange, required: required, className: "w-full px-3 py-2 text-gray-900 bg-gray-50 dark:bg-gray-700 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" },
+        React.createElement('select', { value: value, onChange: onChange, required: required, className: "w-full px-3 py-2 text-gray-900 bg-gray-50 dark:bg-gray-700 dark:text-gray-100 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200" },
             children
         )
     )
@@ -208,14 +178,38 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
     return (
         React.createElement('div', { className: "fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center", 'aria-modal': "true", role: "dialog", onClick: onClose },
-            React.createElement('div', { className: "bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 m-4 max-h-[90vh] overflow-y-auto", onClick: e => e.stopPropagation() },
+            React.createElement('div', { className: "bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6 m-4", onClick: e => e.stopPropagation() },
                 React.createElement('div', { className: "flex justify-between items-center mb-4" },
                     React.createElement('h2', { className: "text-xl font-bold" }, title),
-                    React.createElement('button', { onClick: onClose, className: "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-3xl leading-none" }, '×')
+                    React.createElement('button', { onClick: onClose, className: "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-3xl leading-none transition-colors duration-200" }, '×')
                 ),
                 children
             )
         )
+    );
+};
+
+const MarkdownRenderer = ({ text }) => {
+    if (!text) return null;
+    const lines = text.split('\n');
+    return React.createElement('div', { className: "space-y-2 text-sm text-gray-700 dark:text-gray-300 leading-relaxed" },
+        lines.map((line, index) => {
+            line = line.trim();
+            if (line.startsWith('* ')) {
+                return React.createElement('div', { key: index, className: "flex items-start pl-4" },
+                    React.createElement('span', { className: "mr-2 mt-1" }, '•'),
+                    React.createElement('span', null, line.substring(2).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'))
+                );
+            }
+             const parts = line.split('**').map((part, i) =>
+                i % 2 === 1 ? React.createElement('strong', { key: i, className: "font-bold text-gray-900 dark:text-gray-100" }, part) : part
+            );
+            // Handle empty lines as paragraph breaks
+            if (line === '') {
+                return React.createElement('div', { key: index, className: "h-4" });
+            }
+            return React.createElement('p', { key: index }, ...parts);
+        })
     );
 };
 
@@ -236,7 +230,7 @@ const Header = () => {
         }
     };
 
-    const navLinkClasses = "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors";
+    const navLinkClasses = "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200";
     const mobileNavLinkClasses = "block text-base";
     const activeLinkClasses = "bg-blue-600 text-white";
     const inactiveLinkClasses = "text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700";
@@ -261,13 +255,13 @@ const Header = () => {
             React.createElement('nav', { className: "container mx-auto px-4 sm:px-6 lg:px-8" },
                 React.createElement('div', { className: "flex items-center justify-between h-16" },
                     React.createElement('div', { className: "flex-shrink-0" },
-                        React.createElement(NavLink, { to: "/", className: "text-2xl font-bold text-blue-600 dark:text-blue-400" }, "AI家計簿")
+                        React.createElement(NavLink, { to: "/", className: "text-2xl font-bold text-blue-600 dark:text-blue-400" }, "家計簿アプリ")
                     ),
                     React.createElement('div', { className: "hidden md:flex items-baseline space-x-4" },
                          React.createElement(NavLinks),
                          currentUser && React.createElement('div', { className: "flex items-center gap-4" },
                              React.createElement('span', { className: "text-sm text-gray-500" }, currentUser.email),
-                             React.createElement('button', { onClick: handleLogout, className: "px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700" }, "ログアウト")
+                             React.createElement('button', { onClick: handleLogout, className: "px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors duration-200" }, "ログアウト")
                          )
                     ),
                     React.createElement('div', { className: "md:hidden flex items-center" },
@@ -459,7 +453,7 @@ const InitialSetupScreen = ({ onComplete }) => {
 };
 
 const AnnualSetupScreen = () => {
-    const { settings, allBudgets, saveAnnualSetup } = useAppContext();
+    const { settings, annualData, saveAnnualData } = useAppContext();
     const navigate = useNavigate();
     const [year, setYear] = useState(new Date().getFullYear());
     const [currentData, setCurrentData] = useState(null);
@@ -467,48 +461,60 @@ const AnnualSetupScreen = () => {
 
     useEffect(() => {
         if (settings) {
-            const budgetData = allBudgets[year];
-            if (budgetData) {
-                setCurrentData(budgetData);
+            const data = annualData[year];
+            if (data) {
+                setCurrentData(data);
             } else {
                 const createInitialBudget = () => settings.expenseCategories.reduce((acc, cat) => ({...acc, [cat.id]: 0}), {});
-                const prevYearBudget = allBudgets[year - 1];
-                const startingBalance = prevYearBudget?.plannedBalance?.[11] ?? settings.initialBalance;
-                
+                const startingBalance = annualData[year-1]?.actualBalances[11] ?? settings.initialBalance;
                 setCurrentData({
-                    startingBalance,
-                    normalMonthBudget: createInitialBudget(),
-                    bonusMonthBudget: createInitialBudget(),
-                    plannedBalance: Array(12).fill(startingBalance)
+                    budget: {
+                        year,
+                        startingBalance,
+                        normalMonthBudget: createInitialBudget(),
+                        bonusMonthBudget: createInitialBudget(),
+                        plannedBalance: Array(12).fill(startingBalance)
+                    },
+                    transactions: [],
+                    actualBalances: Array(12).fill(null),
                 });
             }
         }
-    }, [year, allBudgets, settings]);
-    
+    }, [year, annualData, settings]);
+
     const handleBudgetChange = (type, categoryId, value) => {
         if (!currentData) return;
         const budgetKey = type === 'normal' ? 'normalMonthBudget' : 'bonusMonthBudget';
         setCurrentData({
             ...currentData,
-            [budgetKey]: {
-                ...currentData[budgetKey],
-                [categoryId]: parseFloat(value) || 0,
+            budget: {
+                ...currentData.budget,
+                [budgetKey]: {
+                    ...currentData.budget[budgetKey],
+                    [categoryId]: parseFloat(value) || 0,
+                }
             }
         });
     };
 
     const handlePlannedBalanceChange = (monthIndex, value) => {
         if (!currentData) return;
-        const newPlannedBalance = [...currentData.plannedBalance];
+        const newPlannedBalance = [...currentData.budget.plannedBalance];
         newPlannedBalance[monthIndex] = parseFloat(value) || 0;
-        setCurrentData({ ...currentData, plannedBalance: newPlannedBalance });
+        setCurrentData({
+            ...currentData,
+            budget: {
+                ...currentData.budget,
+                plannedBalance: newPlannedBalance,
+            }
+        });
     }
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (currentData) {
             try {
-                await saveAnnualSetup(year, currentData, Array(12).fill(null));
+                await saveAnnualData(year, currentData);
                 alert(`${year}年の設定を保存しました。`);
                 navigate('/monthly');
             } catch (error) {
@@ -534,7 +540,7 @@ const AnnualSetupScreen = () => {
                     React.createElement(Select, { label: "対象年", value: year, onChange: e => setYear(Number(e.target.value)), className: "w-full sm:w-48" },
                         years.map(y => React.createElement('option', { key: y, value: y }, `${y}年`))
                     ),
-                    React.createElement(Input, { label: "年初残高", type: "number", value: currentData.startingBalance, onChange: e => setCurrentData({...currentData, startingBalance: parseFloat(e.target.value) || 0}), className: "w-full sm:w-auto" })
+                    React.createElement(Input, { label: "年初残高", type: "number", value: currentData.budget.startingBalance, onChange: e => setCurrentData({...currentData, budget: {...currentData.budget, startingBalance: parseFloat(e.target.value) || 0}}), className: "w-full sm:w-auto" })
                 )
             ),
 
@@ -552,7 +558,7 @@ const AnnualSetupScreen = () => {
                             key: cat.id,
                             label: cat.name,
                             type: "number",
-                            value: currentData[activeTab === 'normal' ? 'normalMonthBudget' : 'bonusMonthBudget'][cat.id] || 0,
+                            value: currentData.budget[activeTab === 'normal' ? 'normalMonthBudget' : 'bonusMonthBudget'][cat.id] || 0,
                             onChange: e => handleBudgetChange(activeTab, cat.id, e.target.value)
                         })
                     ))
@@ -567,7 +573,7 @@ const AnnualSetupScreen = () => {
                             key: index,
                             label: `${name}末`,
                             type: "number",
-                            value: currentData.plannedBalance[index] || 0,
+                            value: currentData.budget.plannedBalance[index] || 0,
                             onChange: e => handlePlannedBalanceChange(index, e.target.value)
                         })
                     ))
@@ -597,11 +603,11 @@ const SetupScreen = () => {
 };
 
 const ProtectedRoute = ({ children }) => {
-    const { settings, allBudgets } = useAppContext();
+    const { settings, annualData } = useAppContext();
     const location = useLocation();
 
-    const hasBudgetData = allBudgets && Object.keys(allBudgets).length > 0;
-    const isFullySetup = !!settings && hasBudgetData;
+    const hasAnnualData = annualData && Object.keys(annualData).length > 0;
+    const isFullySetup = !!settings && hasAnnualData;
 
     if (!isFullySetup) {
         return React.createElement(Navigate, { to: "/setup", state: { from: location }, replace: true });
@@ -610,103 +616,13 @@ const ProtectedRoute = ({ children }) => {
     return children;
 };
 
-const AiAdvisor = ({ year, month, transactions, budget, settings }) => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [advice, setAdvice] = useState('');
-
-    const generatePrompt = () => {
-        const expensesByCategory = transactions
-            .filter(tx => tx.type === 'expense' && tx.categoryId)
-            .reduce((acc, tx) => {
-                acc[tx.categoryId] = (acc[tx.categoryId] || 0) + tx.amount;
-                return acc;
-            }, {});
-
-        const totalBudget = budget ? Object.values(budget).reduce((a, b) => a + b, 0) : 0;
-        const totalExpense = Object.values(expensesByCategory).reduce((a, b) => a + b, 0);
-
-        let prompt = `あなたは経験豊富なファイナンシャルプランナーです。以下の家計データに基づき、ユーザーが実行可能で具体的な節約アドバイスを3つ、日本語で提案してください。フレンドリーな口調で、なぜその提案が有効なのか理由も添えてください。\n\n`;
-        prompt += `# 家計データ (${year}年${month + 1}月)\n\n`;
-        prompt += `## 支出サマリー\n`;
-        prompt += `- 予算合計: ${formatCurrency(totalBudget)}\n`;
-        prompt += `- 支出合計: ${formatCurrency(totalExpense)}\n`;
-        prompt += `- 差額: ${formatCurrency(totalBudget - totalExpense)}\n\n`;
-        prompt += `## カテゴリ別支出 (実績 / 予算)\n`;
-        settings.expenseCategories.forEach(cat => {
-            const expense = expensesByCategory[cat.id] || 0;
-            const catBudget = budget?.[cat.id] || 0;
-            prompt += `- ${cat.name}: ${formatCurrency(expense)} / ${formatCurrency(catBudget)}\n`;
-        });
-
-        prompt += `\n# アドバイス\n`;
-        return prompt;
-    };
-
-    const handleGenerateAdvice = async () => {
-        if (!process.env.REACT_APP_GEMINI_API_KEY) {
-            alert("APIキーが設定されていません。");
-            return;
-        }
-        setIsModalOpen(true);
-        setIsLoading(true);
-        setAdvice('');
-
-        const prompt = generatePrompt();
-        try {
-            const ai = new GoogleGenAI({ apiKey: process.env.REACT_APP_GEMINI_API_KEY });
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
-                 config: {
-                    temperature: 0.7,
-                    topP: 0.9,
-                }
-            });
-            setAdvice(response.text);
-        } catch (error) {
-            console.error("AI advice generation failed:", error);
-            setAdvice("申し訳ありません、アドバイスの生成中にエラーが発生しました。しばらくしてから再度お試しください。");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    const formattedAdvice = useMemo(() => {
-        if (!advice) return null;
-        return advice.split('\n').map((line, index) => {
-            if (line.startsWith('* ') || line.startsWith('- ')) {
-                return React.createElement('li', { key: index, className: 'ml-4' }, line.substring(2));
-            }
-            if(line.trim().length === 0){
-                return React.createElement('br', { key: index });
-            }
-            return React.createElement('p', { key: index, className: 'mb-2' }, line);
-        });
-    }, [advice]);
-
-    return React.createElement(React.Fragment, null,
-        React.createElement(Button, { onClick: handleGenerateAdvice, className: "bg-purple-600 hover:bg-purple-700", disabled: isLoading },
-            React.createElement(LightBulbIcon), "AI節約アドバイス"
-        ),
-        React.createElement(Modal, { isOpen: isModalOpen, onClose: () => setIsModalOpen(false), title: "AI節約アドバイス" },
-            isLoading ? (
-                React.createElement('div', { className: "flex flex-col items-center justify-center p-8" },
-                    React.createElement('div', { className: "animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500" }),
-                    React.createElement('p', { className: "mt-4 text-lg" }, "アドバイスを生成中...")
-                )
-            ) : (
-                React.createElement('div', { className: "text-gray-700 dark:text-gray-300" }, formattedAdvice)
-            )
-        )
-    );
-};
-
 const MonthlyTrackerScreen = () => {
-    const { settings, allBudgets, allTransactions, addTransaction, updateTransaction, deleteTransaction } = useAppContext();
+    const { settings, annualData, addTransaction, updateTransaction, deleteTransaction } = useAppContext();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTx, setEditingTx] = useState(null);
+    const [isSuggestingCategory, setIsSuggestingCategory] = useState(false);
+    const [suggestionMessage, setSuggestionMessage] = useState('');
     
     const initialTxState = useMemo(() => ({
         type: 'expense',
@@ -720,19 +636,20 @@ const MonthlyTrackerScreen = () => {
     const [incomeSource, setIncomeSource] = useState('salary');
 
     const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+    const month = currentDate.getMonth(); // 0-11
     
-    const budgetData = allBudgets[year];
+    const yearData = annualData[year];
 
     const isBonusMonth = settings && (month + 1 === settings.summerBonusMonth || month + 1 === settings.winterBonusMonth);
-    const budget = budgetData?.[isBonusMonth ? 'bonusMonthBudget' : 'normalMonthBudget'];
+    const budget = yearData?.budget?.[isBonusMonth ? 'bonusMonthBudget' : 'normalMonthBudget'];
     const totalBudget = budget ? Object.values(budget).reduce((sum, val) => sum + val, 0) : 0;
     
-    const monthlyTransactions = useMemo(() => {
-        const startOfMonth = new Date(Date.UTC(year, month, 1)).toISOString().split('T')[0];
-        const endOfMonth = new Date(Date.UTC(year, month + 1, 0)).toISOString().split('T')[0];
-        return allTransactions.filter(tx => tx.date >= startOfMonth && tx.date <= endOfMonth);
-    }, [allTransactions, year, month]);
+    const monthlyTransactions = useMemo(() => 
+        yearData?.transactions.filter(tx => {
+            const txDate = new Date(tx.date);
+            return txDate.getUTCFullYear() === year && txDate.getUTCMonth() === month;
+        }) || [], 
+    [yearData, year, month]);
     
     const expensesByCategory = useMemo(() => 
         monthlyTransactions
@@ -752,6 +669,7 @@ const MonthlyTrackerScreen = () => {
         setEditingTx(null);
         setNewTx(initialTxState);
         setIncomeSource('salary');
+        setSuggestionMessage('');
         setIsModalOpen(true);
     };
 
@@ -764,6 +682,7 @@ const MonthlyTrackerScreen = () => {
             categoryId: tx.categoryId || '',
             date: tx.date.split('T')[0]
         });
+        setSuggestionMessage('');
 
         if (tx.type === 'income') {
             if (tx.description === '給与') {
@@ -780,7 +699,7 @@ const MonthlyTrackerScreen = () => {
     const handleDeleteTransaction = async (transactionId) => {
         if (window.confirm('この取引を削除しますか？')) {
             try {
-                await deleteTransaction(transactionId);
+                await deleteTransaction(year, transactionId);
             } catch (error) {
                 console.error("Failed to delete transaction:", error);
                 alert("取引の削除に失敗しました。");
@@ -801,14 +720,17 @@ const MonthlyTrackerScreen = () => {
              else if (incomeSource === 'bonus') description = '賞与';
         }
 
-        const transactionData = { ...newTx, amount, description };
-        
+        const transactionData = {
+            ...newTx,
+            id: editingTx ? editingTx.id : `tx${Date.now()}`,
+            amount: amount,
+            description: description,
+        };
         try {
-            if (editingTx) {
-                const { id, ...txToUpdate } = transactionData;
-                await updateTransaction(editingTx.id, txToUpdate);
+            if(editingTx) {
+                await updateTransaction(year, transactionData);
             } else {
-                await addTransaction(transactionData);
+                await addTransaction(year, transactionData);
             }
             setIsModalOpen(false);
         } catch(error) {
@@ -817,7 +739,56 @@ const MonthlyTrackerScreen = () => {
         }
     };
 
-    if (!settings || !budgetData) {
+    const handleSuggestCategory = async () => {
+        if (!newTx.description || !settings?.expenseCategories) return;
+
+        setIsSuggestingCategory(true);
+        setSuggestionMessage('');
+
+        const prompt = `取引内容：「${newTx.description}」。以下の支出カテゴリリストから最も適切なものを1つだけ選び、そのIDを返してください。\n\nカテゴリリスト（nameとid）:\n${JSON.stringify(settings.expenseCategories.map(({ id, name }) => ({ id, name })))} \n\n必ず指定されたカテゴリIDの中から選んでください。他の言葉は不要です。`;
+        
+        const schema = {
+            type: Type.OBJECT,
+            properties: {
+                categoryId: {
+                    type: Type.STRING,
+                    description: "Suggested category ID from the provided list."
+                }
+            },
+            required: ['categoryId']
+        };
+
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: schema,
+                }
+            });
+            const json = JSON.parse(response.text);
+            const suggestedCategoryId = json.categoryId;
+            const suggestedCategory = settings.expenseCategories.find(c => c.id === suggestedCategoryId);
+
+            if (suggestedCategory) {
+                setNewTx(prev => ({...prev, categoryId: suggestedCategoryId}));
+                setSuggestionMessage(`AI提案: 「${suggestedCategory.name}」`);
+                setTimeout(() => setSuggestionMessage(''), 3000);
+            } else {
+                 setSuggestionMessage('適切なカテゴリが見つかりませんでした。');
+            }
+
+        } catch (error) {
+            console.error("Error suggesting category:", error);
+            setSuggestionMessage('カテゴリ提案中にエラーが発生しました。');
+        } finally {
+            setIsSuggestingCategory(false);
+        }
+    };
+
+
+    if (!settings || !yearData) {
         return (
             React.createElement(PageWrapper, { title: "月次記録" },
                 React.createElement(Card, null, 
@@ -831,16 +802,13 @@ const MonthlyTrackerScreen = () => {
     
     return (
         React.createElement(PageWrapper, { title: "月次記録" },
-            React.createElement('div', { className: "flex flex-wrap justify-between items-center mb-6 gap-4" },
-                React.createElement('div', { className: "flex gap-2 items-center" },
+            React.createElement('div', { className: "flex justify-between items-center mb-6" },
+                React.createElement('div', { className: "flex gap-2" },
                     React.createElement(Button, { onClick: () => setCurrentDate(new Date(year, month - 1)) }, "< 前月"),
                     React.createElement('h3', { className: "text-2xl font-bold p-2" }, `${year}年 ${MONTH_NAMES[month]}`),
                     React.createElement(Button, { onClick: () => setCurrentDate(new Date(year, month + 1)) }, "次月 >")
                 ),
-                React.createElement('div', { className: "flex gap-2" },
-                    React.createElement(AiAdvisor, { year, month, transactions: monthlyTransactions, budget, settings }),
-                    React.createElement(Button, { onClick: handleOpenAddModal }, React.createElement(PlusIcon), "収支を追加")
-                )
+                React.createElement(Button, { onClick: handleOpenAddModal }, React.createElement(PlusIcon), "収支を追加")
             ),
 
             React.createElement(Card, { className: "mb-6" },
@@ -908,18 +876,24 @@ const MonthlyTrackerScreen = () => {
                     React.createElement(Input, { label: "日付", type: "date", value: newTx.date, onChange: e => setNewTx({...newTx, date: e.target.value}) }),
                     React.createElement(Input, { label: "金額", type: "number", min: "0", value: newTx.amount, onChange: e => setNewTx({...newTx, amount: parseFloat(e.target.value) || 0}), required: true }),
                     
-                    newTx.type === 'expense' ? (
-                        React.createElement(Select, { label: "カテゴリ", value: newTx.categoryId, onChange: e => setNewTx({...newTx, categoryId: e.target.value}), required: true },
-                            React.createElement('option', { value: "" }, "カテゴリを選択..."),
-                            settings.expenseCategories.map(cat => (
-                                React.createElement('option', { key: cat.id, value: cat.id }, cat.name)
-                            ))
-                        )
-                    ) : null,
-
                     (newTx.type === 'expense' || (newTx.type === 'income' && incomeSource === 'other')) && (
                         React.createElement(Input, { label: "説明", type: "text", value: newTx.description, onChange: e => setNewTx({...newTx, description: e.target.value}), placeholder: newTx.type === 'income' ? '収入の詳細' : '支出の詳細' })
                     ),
+
+                    newTx.type === 'expense' ? (
+                        React.createElement('div', null,
+                            React.createElement('div', {className: "flex items-end gap-2"},
+                                React.createElement(Select, { label: "カテゴリ", value: newTx.categoryId, onChange: e => setNewTx({...newTx, categoryId: e.target.value}), required: true },
+                                    React.createElement('option', { value: "" }, "カテゴリを選択..."),
+                                    settings.expenseCategories.map(cat => (
+                                        React.createElement('option', { key: cat.id, value: cat.id }, cat.name)
+                                    ))
+                                ),
+                                React.createElement(Button, { onClick: handleSuggestCategory, disabled: !newTx.description || isSuggestingCategory, className: "mb-px" }, isSuggestingCategory ? '提案中...' : 'カテゴリを提案')
+                            ),
+                            suggestionMessage && React.createElement('p', { className: "text-sm text-blue-600 mt-1" }, suggestionMessage)
+                         )
+                    ) : null,
 
                     React.createElement('div', { className: "flex justify-end gap-2 pt-4" },
                         React.createElement(Button, { onClick: () => setIsModalOpen(false), className: "bg-gray-500 hover:bg-gray-600" }, "キャンセル"),
@@ -932,29 +906,34 @@ const MonthlyTrackerScreen = () => {
 };
 
 const AnnualSummaryScreen = () => {
-    const { settings, allBudgets, allTransactions, allActualBalances, updateActualBalance } = useAppContext();
+    const { settings, annualData, updateActualBalance } = useAppContext();
     const [year, setYear] = useState(new Date().getFullYear());
+    const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
+    const [insightContent, setInsightContent] = useState('');
+    const [isInsightLoading, setIsInsightLoading] = useState(false);
     
-    const availableYears = Object.keys(allBudgets).map(Number).sort((a,b) => b-a);
-    const budgetData = allBudgets[year];
-    const actualBalances = allActualBalances[year] || Array(12).fill(null);
+    const yearData = annualData[year];
 
     useEffect(() => {
-        if (!budgetData && availableYears.length > 0) {
-            setYear(availableYears[0]);
+        if (!yearData) {
+            const availableYears = Object.keys(annualData).map(Number).sort((a,b) => b-a);
+            if (availableYears.length > 0) {
+                setYear(availableYears[0]);
+            }
         }
-    }, [year, budgetData, availableYears]);
+    }, [year, yearData, annualData]);
 
     const summaryData = useMemo(() => {
-        if (!settings || !budgetData) return [];
+        if (!settings || !yearData) return [];
 
-        let runningBalance = budgetData.startingBalance;
+        let runningBalance = yearData.budget.startingBalance;
 
         return MONTH_NAMES.map((monthName, i) => {
-            const startOfMonth = new Date(Date.UTC(year, i, 1)).toISOString().split('T')[0];
-            const endOfMonth = new Date(Date.UTC(year, i + 1, 0)).toISOString().split('T')[0];
-            const monthlyTransactions = allTransactions.filter(tx => tx.date >= startOfMonth && tx.date <= endOfMonth);
-            
+            const monthlyTransactions = yearData.transactions.filter(tx => {
+                const txDate = new Date(tx.date);
+                return txDate.getUTCFullYear() === year && txDate.getUTCMonth() === i;
+            });
+
             const income = monthlyTransactions.filter(tx => tx.type === 'income').reduce((sum, tx) => sum + tx.amount, 0);
             const expense = monthlyTransactions.filter(tx => tx.type === 'expense').reduce((sum, tx) => sum + tx.amount, 0);
             
@@ -966,12 +945,53 @@ const AnnualSummaryScreen = () => {
                 income,
                 expense,
                 calculatedBalance: runningBalance,
-                actualBalance: actualBalances[i],
-                plannedBalance: budgetData.plannedBalance[i]
+                actualBalance: yearData.actualBalances[i],
+                plannedBalance: yearData.budget.plannedBalance[i]
             };
         });
 
-    }, [settings, budgetData, allTransactions, actualBalances, year]);
+    }, [settings, yearData, year]);
+    
+    const handleGetInsights = async () => {
+        if (!yearData || !summaryData) return;
+        
+        setIsInsightModalOpen(true);
+        setIsInsightLoading(true);
+        setInsightContent('');
+
+        const prompt = `
+あなたは経験豊富なファイナンシャルアドバイザーです。以下の日本のユーザーの家計簿データに基づいて、支出パターンを分析し、改善のための具体的なアドバイスをフレンドリーな口調で提供してください。
+
+**${year}年の年間サマリー:**
+- **年初残高:** ${formatCurrency(yearData.budget.startingBalance)}
+- **月次データ:**
+${summaryData.map(d => `  - **${d.name}:** 収入 ${formatCurrency(d.income)}, 支出 ${formatCurrency(d.expense)}, 計画残高 ${formatCurrency(d.plannedBalance)}, 実績/計算残高 ${formatCurrency(d.actualBalance ?? d.calculatedBalance)}`).join('\n')}
+
+**分析とアドバイスのポイント:**
+1. **支出の評価:** 年間の収入と支出のバランスを評価してください。
+2. **課題の特定:** 支出が特に多かった月や、計画と実績の乖離が大きい月を指摘してください。
+3. **改善提案:** 貯蓄を増やすための、実行可能で具体的な改善案を3つほど提案してください。
+
+**出力形式:**
+- 全体をレビューし、ポジティブな点と改善点をまとめてください。
+- 箇条書きや太字（**テキスト**）を効果的に使って、視覚的に分かりやすくしてください。
+`;
+        try {
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                 config: {
+                    systemInstruction: "あなたは、親しみやすく、励ますようなトーンで話す、日本のファイナンシャルプランナーです。",
+                },
+            });
+            setInsightContent(response.text);
+        } catch (error) {
+            console.error("Error getting AI insights:", error);
+            setInsightContent("分析結果の取得中にエラーが発生しました。しばらくしてから再度お試しください。");
+        } finally {
+            setIsInsightLoading(false);
+        }
+    };
 
 
     const handleActualBalanceChange = (monthIndex, value) => {
@@ -985,6 +1005,8 @@ const AnnualSummaryScreen = () => {
         });
     };
 
+    const availableYears = Object.keys(annualData).map(Number).sort((a,b) => b-a);
+
     if (!settings || availableYears.length === 0) {
         return (
             React.createElement(PageWrapper, { title: "年間集計" },
@@ -992,12 +1014,9 @@ const AnnualSummaryScreen = () => {
             )
         );
     }
-     if (!budgetData) {
+     if (!yearData) {
         return (
             React.createElement(PageWrapper, { title: "年間集計" },
-                 React.createElement(Select, { label: "対象年", value: year, onChange: e => setYear(Number(e.target.value)), className: "w-48 mb-4" },
-                    availableYears.map(y => React.createElement('option', { key: y, value: y }, `${y}年`))
-                ),
                 React.createElement(Card, null, React.createElement('p', null, `${year}年のデータがありません。 `, React.createElement(NavLink, { to: "/setup", className: "text-blue-500 hover:underline" }, "設定画面"), "で追加してください。"))
             )
         );
@@ -1006,9 +1025,13 @@ const AnnualSummaryScreen = () => {
     return (
         React.createElement(PageWrapper, { title: "年間集計" },
              React.createElement(Card, { className: "mb-6" },
-                React.createElement('div', { className: "flex items-center gap-4" },
+                React.createElement('div', { className: "flex justify-between items-center gap-4" },
                     React.createElement(Select, { label: "対象年", value: year, onChange: e => setYear(Number(e.target.value)), className: "w-48" },
                         availableYears.map(y => React.createElement('option', { key: y, value: y }, `${y}年`))
+                    ),
+                    React.createElement(Button, { onClick: handleGetInsights, disabled: isInsightLoading }, 
+                        React.createElement(SparklesIcon),
+                        isInsightLoading ? '分析中...' : 'AIで分析'
                     )
                 )
             ),
@@ -1083,15 +1106,27 @@ const AnnualSummaryScreen = () => {
                         )
                     )
                 )
+            ),
+            
+            React.createElement(Modal, { isOpen: isInsightModalOpen, onClose: () => setIsInsightModalOpen(false), title: "AIによる家計分析" },
+                isInsightLoading ?
+                React.createElement('div', {className: "flex flex-col items-center justify-center h-48"}, 
+                    React.createElement('div', { className: "animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" }),
+                    React.createElement('p', {className: "mt-4 text-gray-600 dark:text-gray-300"}, "分析データを生成中...")
+                ) :
+                React.createElement('div', {className: "max-h-[60vh] overflow-y-auto pr-2"},
+                     React.createElement(MarkdownRenderer, { text: insightContent })
+                )
             )
+
         )
     );
 };
 
 const AppShell = () => {
-    const { settings, allBudgets, loading } = useAppContext();
-    const hasBudgetData = allBudgets && Object.keys(allBudgets).length > 0;
-    const isFullySetup = !!settings && hasBudgetData;
+    const { settings, annualData, loading } = useAppContext();
+    const hasAnnualData = annualData && Object.keys(annualData).length > 0;
+    const isFullySetup = !!settings && hasAnnualData;
 
     if (loading) {
         return React.createElement('div', {className: "flex justify-center items-center h-screen"}, React.createElement('p', null, "データを読み込み中..."));
