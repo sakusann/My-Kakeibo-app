@@ -23,7 +23,7 @@ jobs:
       # 3. Reactアプリの依存関係をインストールし、ビルド
       - name: Install and Build
         run: |
-          cd frontend
+          cd C:\Users\Shun\Desktop\Firebase\deploy\frontend\build\frontend
           npm ci
           npm run build
 
