@@ -55,9 +55,10 @@ export function TransactionsTab({ userId }: TransactionsTabProps) {
             <CardTitle>Total Income</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-primary">
+            {/* ▼▼▼ ここを <p> から <div> に変更 ▼▼▼ */}
+            <div className="text-2xl font-bold text-primary">
               {loading ? <Skeleton className="h-8 w-32" /> : `$${income.toFixed(2)}`}
-            </p>
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -65,9 +66,10 @@ export function TransactionsTab({ userId }: TransactionsTabProps) {
             <CardTitle>Total Expenses</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-destructive">
+            {/* ▼▼▼ ここを <p> から <div> に変更 ▼▼▼ */}
+            <div className="text-2xl font-bold text-destructive">
               {loading ? <Skeleton className="h-8 w-32" /> : `$${expenses.toFixed(2)}`}
-            </p>
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -75,9 +77,10 @@ export function TransactionsTab({ userId }: TransactionsTabProps) {
             <CardTitle>Net Balance</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${balance > 0 ? 'text-primary' : balance < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+            {/* ▼▼▼ ここを <p> から <div> に変更 ▼▼▼ */}
+            <div className={`text-2xl font-bold ${balance > 0 ? 'text-primary' : balance < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
               {loading ? <Skeleton className="h-8 w-32" /> : `$${balance.toFixed(2)}`}
-            </p>
+            </div>
           </CardContent>
         </Card>
       </div>

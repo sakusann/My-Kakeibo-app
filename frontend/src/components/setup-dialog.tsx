@@ -33,6 +33,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { MONTH_NAMES } from '../constants'; // Assuming constants.js is still there
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // --- Initial Setup Component (Adapted from reference App.js) ---
 const initialSetupSchema = z.object({
