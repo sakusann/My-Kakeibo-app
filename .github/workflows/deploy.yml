@@ -1,5 +1,4 @@
 name: Deploy to Firebase Hosting
-
 # ワークフローが実行されるタイミングを定義
 on:
   push:
