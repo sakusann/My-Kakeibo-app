@@ -57,6 +57,10 @@ interface InitialSetupProps {
 
 const InitialSetup = ({ onComplete }: InitialSetupProps) => {
   const { settings, saveSettings } = useAppContext();
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+
 
   const form = useForm<InitialSetupFormValues>({
     resolver: zodResolver(initialSetupSchema),
@@ -86,12 +90,11 @@ const InitialSetup = ({ onComplete }: InitialSetupProps) => {
   }, [settings, form.reset]);
 
   const categories = form.watch('expenseCategories');
-  const newCategoryName = form.watch('newCategoryName'); // Assuming a field for new category name
 
   const addCategory = () => {
     if (newCategoryName && newCategoryName.trim() !== '') {
       form.setValue('expenseCategories', [...categories, { id: `c${Date.now()}`, name: newCategoryName.trim() }]);
-      form.setValue('newCategoryName', '');
+      setNewCategoryName('');
     }
   };
 
@@ -100,13 +103,11 @@ const InitialSetup = ({ onComplete }: InitialSetupProps) => {
   };
 
   const startEditing = (category: { id: string; name: string }) => {
-    form.setValue('editingCategoryId', category.id);
-    form.setValue('editingCategoryName', category.name);
+    setEditingCategoryId(category.id);
+    setEditingCategoryName(category.name);
   };
 
   const saveEdit = () => {
-    const editingCategoryId = form.getValues('editingCategoryId');
-    const editingCategoryName = form.getValues('editingCategoryName');
     if (editingCategoryName.trim() === '') {
       alert('カテゴリ名は空にできません。');
       return;
@@ -114,13 +115,13 @@ const InitialSetup = ({ onComplete }: InitialSetupProps) => {
     form.setValue('expenseCategories', categories.map(cat =>
       cat.id === editingCategoryId ? { ...cat, name: editingCategoryName.trim() } : cat
     ));
-    form.setValue('editingCategoryId', null);
-    form.setValue('editingCategoryName', '');
+    setEditingCategoryId(null);
+    setEditingCategoryName('');
   };
 
   const cancelEdit = () => {
-    form.setValue('editingCategoryId', null);
-    form.setValue('editingCategoryName', '');
+    setEditingCategoryId(null);
+    setEditingCategoryName('');
   };
 
   const moveCategory = (index: number, direction: number) => {
@@ -220,18 +221,18 @@ const InitialSetup = ({ onComplete }: InitialSetupProps) => {
           <div className="space-y-2 mt-2">
             {categories.map((cat, index) => (
               <div key={cat.id} className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                {form.watch('editingCategoryId') === cat.id ? (
-                  <> もし `newCategoryName` が `FormField` で管理されていない場合、`form.watch` は `undefined` を返す可能性があります。`newCategoryName` の `FormField` を追加するか、`useState` で管理するように変更してください。`
+                {editingCategoryId === cat.id ? (
+                  <>
                     <Input
-                      value={form.watch('editingCategoryName')}
-                      onChange={(e) => form.setValue('editingCategoryName', e.target.value)}
+                      value={editingCategoryName}
+                      onChange={(e) => setEditingCategoryName(e.target.value)}
                       className="flex-grow"
                     />
                     <Button type="button" size="icon" onClick={saveEdit}><Check className="h-4 w-4" /></Button>
                     <Button type="button" size="icon" variant="ghost" onClick={cancelEdit}><X className="h-4 w-4" /></Button>
                   </>
                 ) : (
-                  <> もし `newCategoryName` が `FormField` で管理されていない場合、`form.watch` は `undefined` を返す可能性があります。`newCategoryName` の `FormField` を追加するか、`useState` で管理するように変更してください。`
+                  <>
                     <div className="flex flex-col">
                       <Button type="button" size="icon" variant="ghost" onClick={() => moveCategory(index, -1)} disabled={index === 0}><ChevronUp className="h-4 w-4" /></Button>
                       <Button type="button" size="icon" variant="ghost" onClick={() => moveCategory(index, 1)} disabled={index === categories.length - 1}><ChevronDown className="h-4 w-4" /></Button>
@@ -242,13 +243,13 @@ const InitialSetup = ({ onComplete }: InitialSetupProps) => {
                   </>
                 )}
               </div>
-            ))} もし `newCategoryName` が `FormField` で管理されていない場合、`form.watch` は `undefined` を返す可能性があります。`newCategoryName` の `FormField` を追加するか、`useState` で管理するように変更してください。`
+            ))}
           </div>
           <div className="flex gap-2 mt-2">
             <Input
               placeholder="新しいカテゴリ名"
-              value={form.watch('newCategoryName')}
-              onChange={(e) => form.setValue('newCategoryName', e.target.value)}
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
               className="flex-grow"
             />
             <Button type="button" onClick={addCategory}><Plus className="h-4 w-4" /></Button>

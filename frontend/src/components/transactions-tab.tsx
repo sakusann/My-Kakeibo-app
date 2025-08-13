@@ -52,34 +52,31 @@ export function TransactionsTab({ userId }: TransactionsTabProps) {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>Total Income</CardTitle>
+            <CardTitle>総収入</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* ▼▼▼ ここを <p> から <div> に変更 ▼▼▼ */}
             <div className="text-2xl font-bold text-primary">
-              {loading ? <Skeleton className="h-8 w-32" /> : `$${income.toFixed(2)}`}
+              {loading ? <Skeleton className="h-8 w-32" /> : `¥${income.toLocaleString()}`}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Total Expenses</CardTitle>
+            <CardTitle>総支出</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* ▼▼▼ ここを <p> から <div> に変更 ▼▼▼ */}
             <div className="text-2xl font-bold text-destructive">
-              {loading ? <Skeleton className="h-8 w-32" /> : `$${expenses.toFixed(2)}`}
+              {loading ? <Skeleton className="h-8 w-32" /> : `¥${expenses.toLocaleString()}`}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Net Balance</CardTitle>
+            <CardTitle>残高</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* ▼▼▼ ここを <p> から <div> に変更 ▼▼▼ */}
-            <div className={`text-2xl font-bold ${balance > 0 ? 'text-primary' : balance < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-              {loading ? <Skeleton className="h-8 w-32" /> : `$${balance.toFixed(2)}`}
+            <div className={`text-2xl font-bold ${balance >= 0 ? 'text-primary' : 'text-destructive'}`}>
+              {loading ? <Skeleton className="h-8 w-32" /> : `¥${balance.toLocaleString()}`}
             </div>
           </CardContent>
         </Card>
@@ -87,11 +84,11 @@ export function TransactionsTab({ userId }: TransactionsTabProps) {
       <Card className="mt-4">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Recent Transactions</CardTitle>
-            <CardDescription>View and manage your income and expenses.</CardDescription>
+            <CardTitle>最近の取引</CardTitle>
+            <CardDescription>収入と支出の一覧です。</CardDescription>
           </div>
           <Button size="sm" onClick={() => setIsDialogOpen(true)} variant="accent">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Transaction
+            <PlusCircle className="mr-2 h-4 w-4" /> 取引を追加
           </Button>
         </CardHeader>
         <CardContent>

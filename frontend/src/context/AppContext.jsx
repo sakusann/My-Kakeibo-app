@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { db } from '../firebase/config';
-import { doc, getDoc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+// ▼▼▼ `config`ではなく、あなたのプロジェクトの正しいパスからインポートしているか確認してください ▼▼▼
+import { db } from '../firebase/config'; // もしパスが違う場合は '@/lib/firebase'などに修正
+import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 
 const AppContext = createContext();
 
@@ -13,7 +14,8 @@ export const AppContextProvider = ({ children }) => {
   const { currentUser } = useAuth();
   const [appData, setAppData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [geminiApiKey, setGeminiApiKey] = useState(null); // APIキーを管理するstate
+  // ▼▼▼ APIキーを管理するstateは不要なので削除 ▼▼▼
+  // const [geminiApiKey, setGeminiApiKey] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
 
   useEffect(() => {
@@ -29,38 +31,36 @@ export const AppContextProvider = ({ children }) => {
   useEffect(() => {
     if (!currentUser) {
       setAppData(null);
-      setGeminiApiKey(null); // ログアウト時にキーをクリア
+      // ▼▼▼ APIキーのクリア処理は不要なので削除 ▼▼▼
+      // setGeminiApiKey(null); 
       setLoading(false);
       return;
     }
 
     setLoading(true);
 
-    // ★ APIキーをFirestoreから取得する非同期関数
-    const fetchApiKey = async () => {
-      try {
-        const keyDocRef = doc(db, 'secrets', 'apiKeys');
-        const keyDocSnap = await getDoc(keyDocRef);
-        if (keyDocSnap.exists()) {
-          setGeminiApiKey(keyDocSnap.data().geminiApiKey);
-        } else {
-          console.error("APIキーが見つかりません！Firestoreの'secrets/apiKeys'ドキュメントを確認してください。");
-        }
-      } catch (error) {
-        console.error("APIキーの取得に失敗しました:", error);
-      }
-    };
+    // ▼▼▼ APIキーをFirestoreから取得する処理は全て削除 ▼▼▼
+    /*
+    const fetchApiKey = async () => { ... };
+    fetchApiKey();
+    */
 
-    fetchApiKey(); // ログイン時にAPIキーを取得
-
-    // ユーザーデータのリアルタイム購読
+    // ユーザーデータのリアルタイム購読（ここはそのまま）
     const userDocRef = doc(db, 'users', currentUser.uid);
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
       if (docSnap.exists()) {
         setAppData(docSnap.data());
       } else {
-        setAppData({ settings: null, annualData: {} });
-      } setLoading(false);
+        // 新規ユーザーの場合、ドキュメントを作成
+        const initialData = {
+          settings: { /* 初期設定など */ },
+          annualData: { /* 今年の初期データなど */ },
+        };
+        setDoc(userDocRef, initialData).then(() => {
+            setAppData(initialData);
+        });
+      } 
+      setLoading(false);
     }, (error) => {
       console.error("Firestoreのデータ取得に失敗:", error);
       setLoading(false);
@@ -73,11 +73,9 @@ export const AppContextProvider = ({ children }) => {
     setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
   }, []);
 
-// AppContext.jsx の中の saveSettings 関数
   const saveSettings = useCallback(async (newSettings) => {
     if (!currentUser) throw new Error("ユーザーが認証されていません。");
     const userDocRef = doc(db, 'users', currentUser.uid);
-    // newSettingsオブジェクトをそのまま保存
     await setDoc(userDocRef, { settings: newSettings }, { merge: true });
   }, [currentUser]);
   
@@ -90,7 +88,7 @@ export const AppContextProvider = ({ children }) => {
   }, [currentUser]);
 
   const saveTransaction = useCallback(async (transaction, year) => {
-    if (!currentUser) throw new Error("ユーザーが認証されていません。");
+    if (!currentUser || !appData) throw new Error("ユーザーデータが読み込まれていません。");
     const userDocRef = doc(db, 'users', currentUser.uid);
     const currentTransactions = appData.annualData?.[year]?.transactions ?? [];
     const isEditing = currentTransactions.some(tx => tx.id === transaction.id);
@@ -107,7 +105,7 @@ export const AppContextProvider = ({ children }) => {
   }, [currentUser, appData]);
 
   const deleteTransaction = useCallback(async (transactionId, year) => {
-    if (!currentUser) throw new Error("ユーザーが認証されていません。");
+    if (!currentUser || !appData) throw new Error("ユーザーデータが読み込まれていません。");
     const userDocRef = doc(db, 'users', currentUser.uid);
     const currentTransactions = appData.annualData?.[year]?.transactions ?? [];
     if (!currentTransactions) return;
@@ -118,7 +116,7 @@ export const AppContextProvider = ({ children }) => {
   }, [currentUser, appData]);
   
   const updateActualBalance = useCallback(async (year, monthIndex, balance) => {
-    if (!currentUser) throw new Error("ユーザーが認証されていません。");
+    if (!currentUser || !appData) throw new Error("ユーザーデータが読み込まれていません。");
     const userDocRef = doc(db, 'users', currentUser.uid);
     const currentBalances = appData.annualData?.[year]?.actualBalances ?? [];
     const newBalances = currentBalances.filter(b => b.month !== monthIndex);
@@ -135,7 +133,8 @@ export const AppContextProvider = ({ children }) => {
     settings: appData?.settings || null,
     annualData: appData?.annualData || {},
     loading,
-    geminiApiKey, // ★追加
+    // ▼▼▼ geminiApiKeyはもう提供しないので削除 ▼▼▼
+    // geminiApiKey, 
     theme,
     toggleTheme,
     saveSettings,

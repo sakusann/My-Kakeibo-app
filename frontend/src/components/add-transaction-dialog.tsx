@@ -7,7 +7,10 @@ import * as z from 'zod';
 import { addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { getSmartCategory } from '@/actions/transactions';
+// ▼▼▼ Firebase Functionsのライブラリをインポート ▼▼▼
+import { getFunctions, httpsCallable } from 'firebase/functions';
+// ▼▼▼ このファイルはもう不要なので削除 ▼▼▼
+// import { getSmartCategory } from '@/actions/transactions'; 
 import { TransactionCategories } from '@/lib/types';
 
 import { Button } from '@/components/ui/button';
@@ -54,6 +57,7 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
 
   const transactionType = form.watch('type');
 
+  // ▼▼▼ handleSmartCategorize関数の中身をCloud Function呼び出しに書き換え ▼▼▼
   const handleSmartCategorize = async () => {
     const description = form.getValues('description');
     if (!description) {
@@ -61,14 +65,33 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
       return;
     }
     setIsCategorizing(true);
-    const result = await getSmartCategory(description);
-    if (result.category) {
-      form.setValue('type', result.category as 'income' | 'expense');
-      toast({ title: 'Success', description: `Categorized as ${result.category}.` });
-    } else {
-      toast({ variant: 'destructive', title: 'Error', description: result.error });
+    try {
+      // 1. Cloud Functionを初期化
+      const functions = getFunctions();
+      const getSmartCategoryFunc = httpsCallable(functions, 'getSmartCategory');
+
+      // 2. Cloud Functionを呼び出し、結果を受け取る
+      const response = await getSmartCategoryFunc({ description });
+      const suggestedCategory = response.data.category as string;
+      
+      // 3. 結果をフォームにセット
+      // 推測されたカテゴリが選択肢に存在するか確認
+      const availableCategories = TransactionCategories[transactionType];
+      if (suggestedCategory && availableCategories.includes(suggestedCategory)) {
+        form.setValue('category', suggestedCategory);
+        toast({ title: 'Success', description: `Categorized as ${suggestedCategory}.` });
+      } else {
+        // 存在しない場合は'Other'に設定（あるいは何もしない）
+        form.setValue('category', 'Other');
+        toast({ title: 'Suggestion', description: `Suggested "${suggestedCategory}", but set to "Other".` });
+      }
+
+    } catch (error) {
+      console.error('Error fetching smart category:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch a category suggestion.' });
+    } finally {
+      setIsCategorizing(false);
     }
-    setIsCategorizing(false);
   };
   
   const onSubmit = async (values: FormValues) => {
@@ -76,7 +99,7 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
       await addDoc(collection(db, `users/${userId}/transactions`), {
         userId,
         type: values.type,
-        date: format(values.date, 'yyyy-MM-dd'),
+        date: format(values.date, 'yyyy-MM-dd'), // Format date to string
         description: values.description,
         amount: values.amount,
         category: values.category,
@@ -85,9 +108,15 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
         title: 'Success!',
         description: 'Your transaction has been added.',
       });
-      form.reset();
+      form.reset({ // resetする際にもデフォルト値を再設定
+        type: 'expense',
+        date: new Date(),
+        description: '',
+        amount: 0,
+      });
       onOpenChange(false);
     } catch (error) {
+       console.error("Error adding transaction:", error);
       toast({
         variant: 'destructive',
         title: 'Uh oh! Something went wrong.',
@@ -113,7 +142,10 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
                   <FormLabel>Transaction Type</FormLabel>
                   <FormControl>
                     <RadioGroup
-                      onValueChange={field.onChange}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        form.setValue('category', ''); // タイプが変わったらカテゴリをリセット
+                      }}
                       defaultValue={field.value}
                       className="flex items-center space-x-4"
                     >
@@ -203,14 +235,14 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {TransactionCategories[transactionType].map((cat) => (
+                      {TransactionCategories[transactionType]?.map((cat) => (
                         <SelectItem key={cat} value={cat}>
                           {cat}
                         </SelectItem>

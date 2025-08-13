@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Logo } from "@/components/logo";
-import { TransactionsTab } from './transactions-tab';
-import { InsightsTab } from './insights-tab';
-import { CategorizeToolTab } from './categorize-tool-tab';
+import { TransactionsTab } from "./transactions-tab";
+import { InsightsTab } from "./insights-tab";
+
 import { useAuth } from '../context/AuthContext';
 import { LoadingSpinner } from './loading-spinner';
 import { SetupDialog } from './setup-dialog';
@@ -63,19 +63,15 @@ export function KakeiboApp() {
       </header>
       <main className="flex flex-1 flex-col gap-4 p-4 sm:p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto">
+          <TabsList className="grid w-full grid-cols-2 max-w-lg mx-auto">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="insights">Insights</TabsTrigger>
-            <TabsTrigger value="tool">Categorize Tool</TabsTrigger>
           </TabsList>
           <TabsContent value="dashboard">
             <TransactionsTab userId={currentUser.uid} />
           </TabsContent>
           <TabsContent value="insights">
             <InsightsTab userId={currentUser.uid} />
-          </TabsContent>
-          <TabsContent value="tool">
-            <CategorizeToolTab />
           </TabsContent>
         </Tabs>
       </main>

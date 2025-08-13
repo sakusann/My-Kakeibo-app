@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { getSmartCategory } from "@/actions/transactions";
+// ▼▼▼ Firebase Functionsのライブラリをインポート ▼▼▼
+import { getFunctions, httpsCallable } from "firebase/functions"; 
+// ▼▼▼ このファイルはもう不要なので削除 ▼▼▼
+// import { getSmartCategory } from "@/actions/transactions";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,17 +29,34 @@ export function CategorizeToolTab() {
     resolver: zodResolver(formSchema),
   });
 
+  // ▼▼▼ onSubmit関数の中身をCloud Function呼び出しに書き換え ▼▼▼
   const onSubmit = async (data: { description: string }) => {
     setLoading(true);
     setError(null);
     setCategory(null);
-    const result = await getSmartCategory(data.description);
-    if (result.category) {
-      setCategory(result.category);
-    } else {
-      setError(result.error || "An unknown error occurred.");
+
+    try {
+      // 1. Cloud Functionを初期化
+      const functions = getFunctions();
+      const getSmartCategoryFunc = httpsCallable(functions, 'getSmartCategory');
+
+      // 2. Cloud Functionを呼び出し、結果を受け取る
+      const response = await getSmartCategoryFunc({ description: data.description });
+      const suggestedCategory = response.data.category as string;
+      
+      // 3. 結果をStateにセット
+      if (suggestedCategory) {
+        setCategory(suggestedCategory);
+      } else {
+        setError("Could not determine a category.");
+      }
+    } catch (err) {
+      console.error("Error calling smart category function:", err);
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -44,7 +64,7 @@ export function CategorizeToolTab() {
       <CardHeader>
         <CardTitle>Smart Categorization Tool</CardTitle>
         <CardDescription>
-          Enter a transaction description to see how AI categorizes it as income or an expense.
+          Enter a transaction description to see how AI categorizes it.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -69,16 +89,19 @@ export function CategorizeToolTab() {
           </form>
         </Form>
 
+        {/* 結果表示エリアはロジックを少し変更 */}
         {(category || error) && (
           <div className="mt-6 flex items-center justify-center rounded-lg border p-6">
-            {category && (
+            {loading && <p>Analyzing...</p>}
+            {!loading && category && (
               <div className="flex items-center gap-4 text-lg">
-                <span className="text-muted-foreground">Type:</span>
+                <span className="text-muted-foreground">Category:</span>
                 <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                <Badge className="text-lg" variant={category === 'income' ? 'default' : 'destructive'}>{category}</Badge>
+                {/* Badgeの表示ロジックはカテゴリ名に応じて変更が必要かもしれません */}
+                <Badge className="text-lg">{category}</Badge>
               </div>
             )}
-            {error && <p className="text-destructive">{error}</p>}
+            {!loading && error && <p className="text-destructive">{error}</p>}
           </div>
         )}
       </CardContent>

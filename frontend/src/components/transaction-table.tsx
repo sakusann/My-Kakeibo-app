@@ -25,8 +25,8 @@ export function TransactionTable({ transactions, loading }: TransactionTableProp
   if (transactions.length === 0) {
     return (
       <div className="text-center py-10 text-muted-foreground">
-        <p>No transactions yet.</p>
-        <p className="text-sm">Click "Add Transaction" to get started.</p>
+        <p>まだ取引がありません。</p>
+        <p className="text-sm">「取引を追加」ボタンから最初の取引を記録しましょう。</p>
       </div>
     );
   }
@@ -36,10 +36,10 @@ export function TransactionTable({ transactions, loading }: TransactionTableProp
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
+            <TableHead>日付</TableHead>
+            <TableHead>内容</TableHead>
+            <TableHead>カテゴリ</TableHead>
+            <TableHead className="text-right">金額</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -54,7 +54,7 @@ export function TransactionTable({ transactions, loading }: TransactionTableProp
                 </Badge>
               </TableCell>
               <TableCell className={`text-right font-semibold ${t.type === 'income' ? 'text-primary' : 'text-destructive'}`}>
-                {t.type === 'income' ? '+' : '-'} ${t.amount.toFixed(2)}
+                {t.type === 'income' ? '+' : '-'} ¥{t.amount.toLocaleString()}
               </TableCell>
             </TableRow>
           ))}
