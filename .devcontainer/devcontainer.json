@@ -1,0 +1,28 @@
+{
+	"name": "Firebase & Gemini Dev Env",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"mounts": [
+		"source=${env:USERPROFILE}\\.config\\gcloud,target=/home/node/.config/gcloud,type=bind,consistency=cached",
+		"source=${env:USERPROFILE}\\.firebase,target=/home/node/.firebase,type=bind,consistency=cached",
+		"source=//var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+	],
+
+	// postCreateCommand は不要なので削除しました
+
+	// コンテナに接続するときのユーザーを指定
+	"remoteUser": "node",
+
+	// ポートフォワーディングとVS Codeの設定
+	"forwardPorts": [4000, 5000, 5001, 3000],
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"dbaeumer.vscode-eslint",
+				"esbenp.prettier-vscode",
+				"aaron-bond.better-comments"
+			]
+		}
+	}
+}
