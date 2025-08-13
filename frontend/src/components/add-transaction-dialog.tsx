@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import * as React from 'react';
+import { useState, ChangeEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -12,6 +13,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 // ▼▼▼ このファイルはもう不要なので削除 ▼▼▼
 // import { getSmartCategory } from '@/actions/transactions'; 
 import { TransactionCategories } from '@/lib/types';
+import { useAppContext } from '@/context/AppContext';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -22,15 +24,17 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
+import { ja } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
 const formSchema = z.object({
-  type: z.enum(['income', 'expense'], { required_error: 'Please select a transaction type.' }),
-  date: z.date({ required_error: 'A date is required.' }),
+  type: z.enum(['income', 'expense'], { message: '取引種別を選択してください。' }),
+  date: z.date({ message: '日付を入力してください。' }),
   description: z.string().min(1, 'Description is required.'),
-  amount: z.coerce.number().positive('Amount must be positive.'),
+  amount: z.number().positive('Amount must be positive.'),
   category: z.string().min(1, 'Category is required.'),
+  categoryDetail: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -42,6 +46,7 @@ interface AddTransactionDialogProps {
 }
 
 export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransactionDialogProps) {
+  const { settings } = useAppContext();
   const { toast } = useToast();
   const [isCategorizing, setIsCategorizing] = useState(false);
 
@@ -52,6 +57,8 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
       date: new Date(),
       description: '',
       amount: 0,
+      category: '', // カテゴリの初期値を空に
+      categoryDetail: '',
     },
   });
 
@@ -72,7 +79,7 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
 
       // 2. Cloud Functionを呼び出し、結果を受け取る
       const response = await getSmartCategoryFunc({ description });
-      const suggestedCategory = response.data.category as string;
+      const suggestedCategory = (response.data as { category?: string })?.category ?? '';
       
       // 3. 結果をフォームにセット
       // 推測されたカテゴリが選択肢に存在するか確認
@@ -102,7 +109,7 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
         date: format(values.date, 'yyyy-MM-dd'), // Format date to string
         description: values.description,
         amount: values.amount,
-        category: values.category,
+        category: values.category === 'その他' && values.categoryDetail ? values.categoryDetail : values.category,
       });
       toast({
         title: 'Success!',
@@ -113,6 +120,8 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
         date: new Date(),
         description: '',
         amount: 0,
+        category: '',
+        categoryDetail: '',
       });
       onOpenChange(false);
     } catch (error) {
@@ -125,12 +134,18 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
     }
   };
 
+  // 曜日ラベルをweekStartsOnに合わせて動的に並べる
+  const getWeekdaysJa = (weekStartsOn: number = 0) => {
+    const days = ['日', '月', '火', '水', '木', '金', '土'];
+    return days.slice(weekStartsOn).concat(days.slice(0, weekStartsOn));
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Transaction</DialogTitle>
-          <DialogDescription>Enter the details of your new transaction below.</DialogDescription>
+          <DialogTitle>取引を追加</DialogTitle>
+          <DialogDescription>新しい取引の詳細を入力してください。</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -139,10 +154,10 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
               name="type"
               render={({ field }) => (
                 <FormItem className="space-y-3">
-                  <FormLabel>Transaction Type</FormLabel>
+                  <FormLabel>取引タイプ</FormLabel>
                   <FormControl>
                     <RadioGroup
-                      onValueChange={(value) => {
+                      onValueChange={(value: string) => {
                         field.onChange(value);
                         form.setValue('category', ''); // タイプが変わったらカテゴリをリセット
                       }}
@@ -153,13 +168,13 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
                         <FormControl>
                           <RadioGroupItem value="expense" />
                         </FormControl>
-                        <FormLabel className="font-normal">Expense</FormLabel>
+                        <FormLabel className="font-normal">支出</FormLabel>
                       </FormItem>
                       <FormItem className="flex items-center space-x-2 space-y-0">
                         <FormControl>
                           <RadioGroupItem value="income" />
                         </FormControl>
-                        <FormLabel className="font-normal">Income</FormLabel>
+                        <FormLabel className="font-normal">収入</FormLabel>
                       </FormItem>
                     </RadioGroup>
                   </FormControl>
@@ -173,10 +188,10 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>内容</FormLabel>
                   <div className="flex gap-2">
                     <FormControl>
-                      <Input placeholder="e.g., Coffee with friends" {...field} />
+                      <Input placeholder="例：友人とカフェ" {...field} />
                     </FormControl>
                     <Button type="button" variant="outline" size="icon" onClick={handleSmartCategorize} disabled={isCategorizing}>
                       <Sparkles className={cn("size-4", isCategorizing && "animate-spin")} />
@@ -193,7 +208,7 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Amount</FormLabel>
+                    <FormLabel>金額</FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="0.00" {...field} />
                     </FormControl>
@@ -206,7 +221,7 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
                 name="date"
                 render={({ field }) => (
                   <FormItem className="flex flex-col pt-2">
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>日付</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -214,13 +229,32 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
                             variant={'outline'}
                             className={cn('pl-3 text-left font-normal', !field.value && 'text-muted-foreground')}
                           >
-                            {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
+                            {field.value ? format(field.value, 'yyyy年M月d日', { locale: ja }) : <span>日付を選択</span>}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                          locale={ja}
+                          weekStartsOn={0} // 週の開始を日曜に
+                          weekdayFormat="short"
+                          components={{
+                            Head: () => (
+                              <thead>
+                                <tr>
+                                  {getWeekdaysJa(0).map((d) => (
+                                    <th key={d} className="px-2 py-1 text-xs font-bold text-center text-gray-600">{d}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                            ),
+                          }}
+                        />
                       </PopoverContent>
                     </Popover>
                     <FormMessage />
@@ -234,28 +268,44 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
               name="category"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category</FormLabel>
+                  <FormLabel>カテゴリ</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
+                        <SelectValue placeholder="カテゴリを選択" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {TransactionCategories[transactionType]?.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
+                      {transactionType === 'expense'
+                        ? (Array.isArray(settings?.categories?.expense) && settings.categories.expense.length > 0
+                            ? settings.categories.expense.map((cat: string, idx: number) => (
+                                <SelectItem key={cat + idx} value={cat}>{cat}</SelectItem>
+                              ))
+                            : <div className="px-4 py-2 text-gray-400">カテゴリ未設定</div>)
+                        : [
+                            <SelectItem key="salary" value="月収">月収</SelectItem>,
+                            <SelectItem key="bonus" value="賞与">賞与</SelectItem>,
+                            <SelectItem key="other-income" value="その他">その他（手入力可）</SelectItem>
+                          ]}
                     </SelectContent>
                   </Select>
+                  {/* 収入カテゴリで「その他」が選択された場合は手入力欄を表示 */}
+                  {transactionType === 'income' && field.value === 'その他' && (
+                    <div className="mt-2">
+                      <Input
+                        placeholder="収入カテゴリを入力"
+                        value={form.getValues('categoryDetail') || ''}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => form.setValue('categoryDetail', e.target.value)}
+                      />
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
             />
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button type="submit" className="bg-primary hover:bg-primary/90">Save Transaction</Button>
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>キャンセル</Button>
+              <Button type="submit" className="bg-primary hover:bg-primary/90">保存</Button>
             </DialogFooter>
           </form>
         </Form>
