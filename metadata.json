@@ -1,6 +1,5 @@
 {
-  "name": "AI-Powered Household Finance Tracker with Firebase",
-  "description": "An AI-powered application to manage your household finances. It uses Firebase for real-time data sync and provides personalized savings advice with Google's Gemini API.",
+  "description": "A simple and powerful household budgeting application.",
   "requestFramePermissions": [],
-  "prompt": "Create a household finance management application that leverages Firebase for backend services (Authentication, Firestore) and incorporates an AI feature using the Google Gemini API to provide users with personalized financial advice based on their spending habits."
+  "name": "App"
 }
