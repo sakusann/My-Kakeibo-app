@@ -55,8 +55,8 @@ export function KakeiboApp() {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>{currentUser.displayName}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setIsSetupDialogOpen(true)}>Settings</DropdownMenuItem>
-              <DropdownMenuItem onClick={onSignOut}>Logout</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsSetupDialogOpen(true)}>設定</DropdownMenuItem>
+              <DropdownMenuItem onClick={onSignOut}>ログアウト</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -64,8 +64,8 @@ export function KakeiboApp() {
       <main className="flex flex-1 flex-col gap-4 p-4 sm:p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2 max-w-lg mx-auto">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="insights">Insights</TabsTrigger>
+            <TabsTrigger value="dashboard">ダッシュボード</TabsTrigger>
+            <TabsTrigger value="insights">AI分析</TabsTrigger>
           </TabsList>
           <TabsContent value="dashboard">
             <TransactionsTab userId={currentUser.uid} />

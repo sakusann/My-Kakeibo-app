@@ -33,6 +33,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { MONTH_NAMES } from '../constants'; // Assuming constants.js is still there
+import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // --- Initial Setup Component (Adapted from reference App.js) ---
@@ -41,6 +42,10 @@ const initialSetupSchema = z.object({
   summerBonus: z.coerce.number().min(0, "夏季賞与は0以上である必要があります。"),
   winterBonus: z.coerce.number().min(0, "冬季賞与は0以上である必要があります。"),
   initialBalance: z.coerce.number().min(0, "初期残高は0以上である必要があります。"),
+  incomeCategories: z.array(z.object({
+    id: z.string(),
+    name: z.string().min(1, "カテゴリ名は必須です。"),
+  })),
   expenseCategories: z.array(z.object({
     id: z.string(),
     name: z.string().min(1, "カテゴリ名は必須です。"),
@@ -51,68 +56,49 @@ const initialSetupSchema = z.object({
 
 type InitialSetupFormValues = z.infer<typeof initialSetupSchema>;
 
-interface InitialSetupProps {
-  onComplete: () => void;
+interface Category {
+  id: string;
+  name: string;
 }
 
-const InitialSetup = ({ onComplete }: InitialSetupProps) => {
-  const { settings, saveSettings } = useAppContext();
+interface CategoryEditorProps {
+  title: string;
+  categories: Category[];
+  onCategoriesChange: (categories: Category[]) => void;
+}
+
+const CategoryEditor = ({ title, categories, onCategoriesChange }: CategoryEditorProps) => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
-
-
-  const form = useForm<InitialSetupFormValues>({
-    resolver: zodResolver(initialSetupSchema),
-    defaultValues: {
-      monthlyIncome: settings?.monthlyIncome ?? 300000,
-      summerBonus: settings?.summerBonus ?? 0,
-      winterBonus: settings?.winterBonus ?? 0,
-      initialBalance: settings?.initialBalance ?? 1000000,
-      expenseCategories: settings?.expenseCategories ?? [{ id: 'c1', name: '食費' }, { id: 'c2', name: '住居費' }],
-      summerBonusMonths: settings?.summerBonusMonths ?? [7],
-      winterBonusMonths: settings?.winterBonusMonths ?? [12],
-    },
-  });
-
-  useEffect(() => {
-    if (settings) {
-      form.reset({
-        monthlyIncome: settings.monthlyIncome ?? 300000,
-        summerBonus: settings.summerBonus ?? 0,
-        winterBonus: settings.winterBonus ?? 0,
-        initialBalance: settings.initialBalance ?? 1000000,
-        expenseCategories: settings.expenseCategories ?? [{ id: 'c1', name: '食費' }, { id: 'c2', name: '住居費' }],
-        summerBonusMonths: settings.summerBonusMonths ?? [7],
-        winterBonusMonths: settings.winterBonusMonths ?? [12],
-      });
-    }
-  }, [settings, form.reset]);
-
-  const categories = form.watch('expenseCategories');
+  const { toast } = useToast();
 
   const addCategory = () => {
     if (newCategoryName && newCategoryName.trim() !== '') {
-      form.setValue('expenseCategories', [...categories, { id: `c${Date.now()}`, name: newCategoryName.trim() }]);
+      onCategoriesChange([...categories, { id: crypto.randomUUID(), name: newCategoryName.trim() }]);
       setNewCategoryName('');
     }
   };
 
   const removeCategory = (id: string) => {
-    form.setValue('expenseCategories', categories.filter(c => c.id !== id));
+    onCategoriesChange(categories.filter(c => c.id !== id));
   };
 
-  const startEditing = (category: { id: string; name: string }) => {
+  const startEditing = (category: Category) => {
     setEditingCategoryId(category.id);
     setEditingCategoryName(category.name);
   };
 
   const saveEdit = () => {
     if (editingCategoryName.trim() === '') {
-      alert('カテゴリ名は空にできません。');
+      toast({
+        variant: 'destructive',
+        title: 'エラー',
+        description: 'カテゴリ名は空にできません。',
+      });
       return;
     }
-    form.setValue('expenseCategories', categories.map(cat =>
+    onCategoriesChange(categories.map(cat =>
       cat.id === editingCategoryId ? { ...cat, name: editingCategoryName.trim() } : cat
     ));
     setEditingCategoryId(null);
@@ -128,8 +114,96 @@ const InitialSetup = ({ onComplete }: InitialSetupProps) => {
     const newCategories = [...categories];
     const [movedItem] = newCategories.splice(index, 1);
     newCategories.splice(index + direction, 0, movedItem);
-    form.setValue('expenseCategories', newCategories);
+    onCategoriesChange(newCategories);
   };
+
+  return (
+    <div>
+      <Label className="text-lg font-medium">{title}</Label>
+      <div className="space-y-2 mt-2">
+        {categories.map((cat, index) => (
+          <div key={cat.id} className="flex items-center gap-2 p-2 bg-muted rounded-md">
+            {editingCategoryId === cat.id ? (
+              <>
+                <Input
+                  value={editingCategoryName}
+                  onChange={(e) => setEditingCategoryName(e.target.value)}
+                  className="flex-grow"
+                />
+                <Button type="button" size="icon" onClick={saveEdit}><Check className="h-4 w-4" /></Button>
+                <Button type="button" size="icon" variant="ghost" onClick={cancelEdit}><X className="h-4 w-4" /></Button>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col">
+                  <Button type="button" size="icon" variant="ghost" onClick={() => moveCategory(index, -1)} disabled={index === 0}><ChevronUp className="h-4 w-4" /></Button>
+                  <Button type="button" size="icon" variant="ghost" onClick={() => moveCategory(index, 1)} disabled={index === categories.length - 1}><ChevronDown className="h-4 w-4" /></Button>
+                </div>
+                <span className="flex-grow ml-2">{cat.name}</span>
+                <Button type="button" size="icon" variant="ghost" onClick={() => startEditing(cat)}><Pencil className="h-4 w-4" /></Button>
+                <Button type="button" size="icon" variant="ghost" onClick={() => removeCategory(cat.id)}><Trash2 className="h-4 w-4" /></Button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2 mt-2">
+        <Input
+          placeholder="新しいカテゴリ名"
+          value={newCategoryName}
+          onChange={(e) => setNewCategoryName(e.target.value)}
+          className="flex-grow"
+        />
+        <Button type="button" onClick={addCategory}><Plus className="h-4 w-4" /></Button>
+      </div>
+    </div>
+  );
+};
+
+interface InitialSetupProps {
+  onComplete: () => void;
+}
+
+const InitialSetup = ({ onComplete }: InitialSetupProps) => {
+  const { settings, saveSettings } = useAppContext();
+  const { toast } = useToast();
+
+  const form = useForm<InitialSetupFormValues>({
+    resolver: zodResolver(initialSetupSchema),
+    defaultValues: {
+      monthlyIncome: settings?.monthlyIncome ?? 300000,
+      summerBonus: settings?.summerBonus ?? 0,
+      winterBonus: settings?.winterBonus ?? 0,
+      initialBalance: settings?.initialBalance ?? 1000000,
+      incomeCategories: settings?.incomeCategories ?? [
+        { id: 'i1', name: '給与' },
+        { id: 'i2', name: '賞与' },
+        { id: 'i3', name: 'その他' },
+      ],
+      expenseCategories: settings?.expenseCategories ?? [{ id: 'c1', name: '食費' }, { id: 'c2', name: '住居費' }],
+      summerBonusMonths: settings?.summerBonusMonths ?? [7],
+      winterBonusMonths: settings?.winterBonusMonths ?? [12],
+    },
+  });
+
+  useEffect(() => {
+    if (settings) {
+      form.reset({
+        monthlyIncome: settings.monthlyIncome ?? 300000,
+        summerBonus: settings.summerBonus ?? 0,
+        winterBonus: settings.winterBonus ?? 0,
+        initialBalance: settings.initialBalance ?? 1000000,
+        incomeCategories: settings.incomeCategories ?? [
+          { id: 'i1', name: '給与' },
+          { id: 'i2', name: '賞与' },
+          { id: 'i3', name: 'その他' },
+        ],
+        expenseCategories: settings.expenseCategories ?? [{ id: 'c1', name: '食費' }, { id: 'c2', name: '住居費' }],
+        summerBonusMonths: settings.summerBonusMonths ?? [7],
+        winterBonusMonths: settings.winterBonusMonths ?? [12],
+      });
+    }
+  }, [settings, form.reset]);
 
   const toggleBonusMonth = (month: number, type: 'summer' | 'winter') => {
     const currentMonths = form.getValues(type === 'summer' ? 'summerBonusMonths' : 'winterBonusMonths');
@@ -148,15 +222,23 @@ const InitialSetup = ({ onComplete }: InitialSetupProps) => {
         summerBonus: values.summerBonus,
         winterBonus: values.winterBonus,
         initialBalance: values.initialBalance,
+        incomeCategories: values.incomeCategories,
         expenseCategories: values.expenseCategories,
         summerBonusMonths: values.summerBonusMonths,
         winterBonusMonths: values.winterBonusMonths,
       });
-      alert('初期設定を保存しました。');
+      toast({
+        title: '成功',
+        description: '初期設定を保存しました。',
+      });
       onComplete();
     } catch (error) {
       console.error("設定の保存に失敗:", error);
-      alert("設定の保存に失敗しました。");
+      toast({
+        variant: 'destructive',
+        title: 'エラー',
+        description: '設定の保存に失敗しました。',
+      });
     }
   };
 
@@ -216,45 +298,29 @@ const InitialSetup = ({ onComplete }: InitialSetupProps) => {
           )}
         />
 
-        <div>
-          <Label className="text-lg font-medium">支出カテゴリ</Label>
-          <div className="space-y-2 mt-2">
-            {categories.map((cat, index) => (
-              <div key={cat.id} className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                {editingCategoryId === cat.id ? (
-                  <>
-                    <Input
-                      value={editingCategoryName}
-                      onChange={(e) => setEditingCategoryName(e.target.value)}
-                      className="flex-grow"
-                    />
-                    <Button type="button" size="icon" onClick={saveEdit}><Check className="h-4 w-4" /></Button>
-                    <Button type="button" size="icon" variant="ghost" onClick={cancelEdit}><X className="h-4 w-4" /></Button>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex flex-col">
-                      <Button type="button" size="icon" variant="ghost" onClick={() => moveCategory(index, -1)} disabled={index === 0}><ChevronUp className="h-4 w-4" /></Button>
-                      <Button type="button" size="icon" variant="ghost" onClick={() => moveCategory(index, 1)} disabled={index === categories.length - 1}><ChevronDown className="h-4 w-4" /></Button>
-                    </div>
-                    <span className="flex-grow ml-2">{cat.name}</span>
-                    <Button type="button" size="icon" variant="ghost" onClick={() => startEditing(cat)}><Pencil className="h-4 w-4" /></Button>
-                    <Button type="button" size="icon" variant="ghost" onClick={() => removeCategory(cat.id)}><Trash2 className="h-4 w-4" /></Button>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2 mt-2">
-            <Input
-              placeholder="新しいカテゴリ名"
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              className="flex-grow"
+        <FormField
+          control={form.control}
+          name="incomeCategories"
+          render={({ field }) => (
+            <CategoryEditor
+              title="収入カテゴリ"
+              categories={field.value}
+              onCategoriesChange={field.onChange}
             />
-            <Button type="button" onClick={addCategory}><Plus className="h-4 w-4" /></Button>
-          </div>
-        </div>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="expenseCategories"
+          render={({ field }) => (
+            <CategoryEditor
+              title="支出カテゴリ"
+              categories={field.value}
+              onCategoriesChange={field.onChange}
+            />
+          )}
+        />
 
         <div>
           <Label className="text-lg font-medium">ボーナス月設定</Label>
@@ -372,10 +438,17 @@ const AnnualSetup = () => {
         transactions: annualData[year]?.transactions || [],
         actualBalances: annualData[year]?.actualBalances || [],
       });
-      alert(`${year}年の年間設定を保存しました。`);
+      toast({
+        title: '成功',
+        description: `${year}年の年間設定を保存しました。`,
+      });
     } catch (error) {
       console.error("年間設定の保存に失敗:", error);
-      alert("年間設定の保存に失敗しました。");
+      toast({
+        variant: 'destructive',
+        title: 'エラー',
+        description: '設定の保存に失敗しました。',
+      });
     }
   };
 

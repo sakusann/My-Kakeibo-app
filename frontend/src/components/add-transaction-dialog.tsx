@@ -11,9 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 // ▼▼▼ Firebase Functionsのライブラリをインポート ▼▼▼
 import { getFunctions, httpsCallable } from 'firebase/functions';
 // ▼▼▼ このファイルはもう不要なので削除 ▼▼▼
-// import { getSmartCategory } from '@/actions/transactions'; 
-import { TransactionCategories } from '@/lib/types';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/AppContext.tsx';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -31,11 +29,17 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 const formSchema = z.object({
   type: z.enum(['income', 'expense'], { message: '取引種別を選択してください。' }),
   date: z.date({ message: '日付を入力してください。' }),
-  description: z.string().min(1, 'Description is required.'),
-  amount: z.number().positive('Amount must be positive.'),
-  category: z.string().min(1, 'Category is required.'),
+  description: z.string().min(1, '内容を入力してください。'),
+  amount: z.coerce.number().positive('金額は0より大きい値を入力してください。'),
+  category: z.string().min(1, 'カテゴリを選択してください。'),
   categoryDetail: z.string().optional(),
 });
+
+// 曜日ラベルをweekStartsOnに合わせて動的に並べるヘルパー関数
+const getWeekdaysJa = (weekStartsOn: number = 0) => {
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  return days.slice(weekStartsOn).concat(days.slice(0, weekStartsOn));
+};
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -68,7 +72,7 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
   const handleSmartCategorize = async () => {
     const description = form.getValues('description');
     if (!description) {
-      toast({ variant: 'destructive', title: 'Please enter a description first.' });
+      toast({ variant: 'destructive', title: '先に内容を入力してください。' });
       return;
     }
     setIsCategorizing(true);
@@ -83,19 +87,23 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
       
       // 3. 結果をフォームにセット
       // 推測されたカテゴリが選択肢に存在するか確認
-      const availableCategories = TransactionCategories[transactionType];
+      const availableCategories = (transactionType === 'income' 
+        ? settings?.incomeCategories 
+        : settings?.expenseCategories
+      )?.map(c => c.name) ?? [];
+
       if (suggestedCategory && availableCategories.includes(suggestedCategory)) {
         form.setValue('category', suggestedCategory);
-        toast({ title: 'Success', description: `Categorized as ${suggestedCategory}.` });
+        toast({ title: '成功', description: `${suggestedCategory} に分類しました。` });
       } else {
-        // 存在しない場合は'Other'に設定（あるいは何もしない）
-        form.setValue('category', 'Other');
-        toast({ title: 'Suggestion', description: `Suggested "${suggestedCategory}", but set to "Other".` });
+        // 存在しない場合は'その他'に設定
+        form.setValue('category', 'その他');
+        toast({ title: '提案', description: `「${suggestedCategory || 'カテゴリ不明'}」と推測されましたが、「その他」に設定しました。` });
       }
 
     } catch (error) {
       console.error('Error fetching smart category:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch a category suggestion.' });
+      toast({ variant: 'destructive', title: 'エラー', description: 'カテゴリの提案を取得できませんでした。' });
     } finally {
       setIsCategorizing(false);
     }
@@ -112,8 +120,8 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
         category: values.category === 'その他' && values.categoryDetail ? values.categoryDetail : values.category,
       });
       toast({
-        title: 'Success!',
-        description: 'Your transaction has been added.',
+        title: '成功しました！',
+        description: '取引が追加されました。',
       });
       form.reset({ // resetする際にもデフォルト値を再設定
         type: 'expense',
@@ -128,16 +136,10 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
        console.error("Error adding transaction:", error);
       toast({
         variant: 'destructive',
-        title: 'Uh oh! Something went wrong.',
-        description: 'There was a problem saving your transaction.',
+        title: 'エラーが発生しました',
+        description: '取引の保存中に問題が発生しました。',
       });
     }
-  };
-
-  // 曜日ラベルをweekStartsOnに合わせて動的に並べる
-  const getWeekdaysJa = (weekStartsOn: number = 0) => {
-    const days = ['日', '月', '火', '水', '木', '金', '土'];
-    return days.slice(weekStartsOn).concat(days.slice(0, weekStartsOn));
   };
 
   return (
@@ -243,17 +245,6 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
                           locale={ja}
                           weekStartsOn={0} // 週の開始を日曜に
                           weekdayFormat="short"
-                          components={{
-                            Head: () => (
-                              <thead>
-                                <tr>
-                                  {getWeekdaysJa(0).map((d) => (
-                                    <th key={d} className="px-2 py-1 text-xs font-bold text-center text-gray-600">{d}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                            ),
-                          }}
                         />
                       </PopoverContent>
                     </Popover>
@@ -276,24 +267,21 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {transactionType === 'expense'
-                        ? (Array.isArray(settings?.categories?.expense) && settings.categories.expense.length > 0
-                            ? settings.categories.expense.map((cat: string, idx: number) => (
-                                <SelectItem key={cat + idx} value={cat}>{cat}</SelectItem>
-                              ))
-                            : <div className="px-4 py-2 text-gray-400">カテゴリ未設定</div>)
-                        : [
-                            <SelectItem key="salary" value="月収">月収</SelectItem>,
-                            <SelectItem key="bonus" value="賞与">賞与</SelectItem>,
-                            <SelectItem key="other-income" value="その他">その他（手入力可）</SelectItem>
-                          ]}
+                      {(transactionType === 'expense'
+                        ? settings?.expenseCategories
+                        : settings?.incomeCategories
+                      )?.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                      ))}
+                      {/* 「その他」を手動で追加 */}
+                      <SelectItem value="その他">その他（手入力可）</SelectItem>
                     </SelectContent>
                   </Select>
-                  {/* 収入カテゴリで「その他」が選択された場合は手入力欄を表示 */}
-                  {transactionType === 'income' && field.value === 'その他' && (
+                  {/* 「その他」が選択された場合は手入力欄を表示 */}
+                  {field.value === 'その他' && (
                     <div className="mt-2">
                       <Input
-                        placeholder="収入カテゴリを入力"
+                        placeholder="カテゴリ詳細を入力"
                         value={form.getValues('categoryDetail') || ''}
                         onChange={(e: ChangeEvent<HTMLInputElement>) => form.setValue('categoryDetail', e.target.value)}
                       />
@@ -305,7 +293,7 @@ export function AddTransactionDialog({ userId, isOpen, onOpenChange }: AddTransa
             />
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>キャンセル</Button>
-              <Button type="submit" className="bg-primary hover:bg-primary/90">保存</Button>
+              <Button type="submit">保存</Button>
             </DialogFooter>
           </form>
         </Form>

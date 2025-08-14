@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { User } from '../lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 // Define the type for the context value
 interface AuthContextType {
@@ -20,6 +21,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   const onGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
@@ -27,7 +29,11 @@ export const AuthProvider = ({ children }) => {
       await signInWithPopup(auth, provider);
     } catch (error) {
       console.error("Google Sign-In Error:", error);
-      alert("Googleログインに失敗しました。");
+      toast({
+        variant: 'destructive',
+        title: 'ログインエラー',
+        description: 'Googleログインに失敗しました。後でもう一度お試しください。',
+      });
     }
   };
 
@@ -36,7 +42,11 @@ export const AuthProvider = ({ children }) => {
       await signOut(auth);
     } catch (error) {
       console.error("Sign-Out Error:", error);
-      alert("ログアウトに失敗しました。");
+      toast({
+        variant: 'destructive',
+        title: 'ログアウトエラー',
+        description: 'ログアウトに失敗しました。',
+      });
     }
   };
 
