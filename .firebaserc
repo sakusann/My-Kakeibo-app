@@ -1,5 +1,9 @@
 {
   "projects": {
-    "default": "my-kakeibo-app-12337"
-  }
+    "default": "my-kakeibo-app-12337",
+    "prod": "my-kakeibo-app-prod",
+    "dev": "my-kakeibo-app-12337"
+  },
+  "targets": {},
+  "etags": {}
 }
