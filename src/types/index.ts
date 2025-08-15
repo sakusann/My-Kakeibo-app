@@ -1,3 +1,5 @@
+// src/types/index.ts
+
 import { Timestamp } from "firebase/firestore";
 
 export interface Category {
@@ -11,15 +13,10 @@ export interface PaydaySettings {
 }
 
 export interface Settings {
-  monthlyIncome: number;
-  summerBonus: number;
-  winterBonus: number;
   initialBalance: number;
   incomeCategories: Category[];
   expenseCategories: Category[];
-  summerBonusMonths: number[];
-  winterBonusMonths: number[];
-  paydaySettings: PaydaySettings;
+  paydaySettings?: PaydaySettings;
 }
 
 export interface MonthlyBudget {
@@ -31,6 +28,13 @@ export interface AnnualBudget {
   plannedBalance: number[];
   normalMonthBudget: MonthlyBudget;
   bonusMonthBudget: MonthlyBudget;
+  monthlyIncome: number;
+  summerBonus: number;
+  winterBonus: number;
+  summerBonusMonths: number[];
+  winterBonusMonths: number[];
+  summerBonusPayday: number;
+  winterBonusPayday: number;
 }
 
 export interface AnnualData {
@@ -47,7 +51,6 @@ export interface Transaction {
   description: string;
   amount: number;
   category: string;
-  otherCategoryDetail?: string;
   tags?: string[];
 }
 
@@ -59,7 +62,6 @@ export interface FirestoreTransaction {
     description: string;
     amount: number;
     category: string;
-    otherCategoryDetail?: string;
     tags?: string[];
 }
 
@@ -67,9 +69,10 @@ export interface RecurringPayment {
     id: string;
     title: string;
     amount: number;
-    paymentDay: number; // 1-31
+    paymentDay: number;
     categoryId: string;
     type: 'income' | 'expense';
+    isSystemGenerated?: boolean; // ★ システムが自動生成した収入かどうかのフラグ
 }
 
 export interface PaydayCycle {

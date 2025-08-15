@@ -1,10 +1,10 @@
 // src/contexts/AppContext.tsx
 
 import { createContext, useState, useEffect, ReactNode, useContext, useCallback, useMemo } from 'react';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, getDoc, updateDoc, deleteDoc } from 'firebase/firestore'; // updateDoc, deleteDoc をインポート
 import { db } from '../lib/firebase';
 import { useAuthContext } from './AuthContext';
-import { Settings, AnnualData, RecurringPayment, AnnualBudget, Category } from '../types';
+import { Settings, AnnualData, RecurringPayment, AnnualBudget, Transaction } from '../types';
 
 interface AppContextType {
   settings: Settings | null;
@@ -14,6 +14,8 @@ interface AppContextType {
   saveSettings: (newSettings: Partial<Settings>) => Promise<void>;
   saveAnnualBudget: (year: string, budgetData: AnnualBudget) => Promise<void>;
   saveRecurringPayments: (payments: RecurringPayment[]) => Promise<void>;
+  updateTransaction: (id: string, data: Partial<Transaction>) => Promise<void>; // ★ 追加
+  deleteTransaction: (id: string) => Promise<void>; // ★ 追加
   isInitialSetupDone: boolean;
   getCategoryName: (id: string) => string;
 }
@@ -21,9 +23,6 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const defaultSettings: Settings = {
-  monthlyIncome: 0,
-  summerBonus: 0,
-  winterBonus: 0,
   initialBalance: 0,
   incomeCategories: [ { id: 'cat_salary', name: '給与' }, { id: 'cat_bonus', name: '賞与' }, ],
   expenseCategories: [
@@ -32,8 +31,6 @@ const defaultSettings: Settings = {
     { id: 'cat_comm', name: '通信費' }, { id: 'cat_ent', name: '交際・娯楽費' },
     { id: 'cat_medical', name: '医療費' }, { id: 'cat_other', name: 'その他' },
   ],
-  summerBonusMonths: [7],
-  winterBonusMonths: [12],
   paydaySettings: { payday: 25, rollover: 'before', }
 };
 
@@ -73,7 +70,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setSettings(loadedSettings);
         setAnnualData(data.annualData || {});
         setRecurringPayments(data.recurringPayments || []);
-        setIsInitialSetupDone(!!(loadedSettings.monthlyIncome > 0 && loadedSettings.paydaySettings?.payday > 0));
+        setIsInitialSetupDone(!!(loadedSettings.paydaySettings?.payday));
       } else {
         setSettings(defaultSettings); setAnnualData({}); setRecurringPayments([]);
         setIsInitialSetupDone(false);
@@ -83,30 +80,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [currentUser]);
   
-  // ★★★ここからが今回の修正の核心です★★★
   const saveSettings = useCallback(async (newSettings: Partial<Settings>) => {
       if (!currentUser) return;
       const userDocRef = doc(db, 'users', currentUser.uid);
-
-      // 1. 現在の最新の設定情報を取得
-      const currentSettings = settings || defaultSettings;
-
-      // 2. 最新情報に、今回の変更(newSettings)をマージ（結合）する
+      const docSnap = await getDoc(userDocRef);
+      const currentData = docSnap.data();
+      const currentSettings = currentData?.settings || defaultSettings;
       const updatedSettings = { ...currentSettings, ...newSettings };
-
-      // 3. マージ済みの完全なオブジェクトで、Firestoreを安全に上書きする
-      await setDoc(userDocRef, { 
-          settings: updatedSettings 
-      }, { merge: true }); // merge:trueはannualDataなど他のトップレベルフィールドを保護する
-
-  }, [currentUser, settings]); // settingsを依存配列に追加
+      await setDoc(userDocRef, { settings: updatedSettings }, { merge: true });
+  }, [currentUser]);
   
   const saveAnnualBudget = useCallback(async (year: string, budgetData: AnnualBudget) => {
       if (!currentUser) return;
       const userDocRef = doc(db, 'users', currentUser.uid);
-      await setDoc(userDocRef, {
-          annualData: { [year]: { budget: budgetData } }
-      }, { merge: true });
+      await setDoc(userDocRef, { annualData: { [year]: { budget: budgetData } } }, { merge: true });
   }, [currentUser]);
 
   const saveRecurringPayments = useCallback(async (payments: RecurringPayment[]) => {
@@ -114,11 +101,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const userDocRef = doc(db, 'users', currentUser.uid);
       await setDoc(userDocRef, { recurringPayments: payments }, { merge: true });
   }, [currentUser]);
+
+  // ★★★ここからが修正の核心です★★★
+  const updateTransaction = useCallback(async (id: string, data: Partial<Transaction>) => {
+    if (!currentUser) return;
+    const transDocRef = doc(db, 'users', currentUser.uid, 'transactions', id);
+    await updateDoc(transDocRef, data);
+  }, [currentUser]);
+
+  const deleteTransaction = useCallback(async (id: string) => {
+    if (!currentUser) return;
+    const transDocRef = doc(db, 'users', currentUser.uid, 'transactions', id);
+    await deleteDoc(transDocRef);
+  }, [currentUser]);
   // ★★★ここまでが修正の核心です★★★
 
   const value = {
     settings, annualData, recurringPayments, loading,
     saveSettings, saveAnnualBudget, saveRecurringPayments,
+    updateTransaction, deleteTransaction, // ★追加
     isInitialSetupDone,
     getCategoryName,
   };
