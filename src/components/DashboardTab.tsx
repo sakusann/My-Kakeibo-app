@@ -73,46 +73,11 @@ export default function DashboardTab() {
         fetchTransactions();
     }, [currentUser, cycle]);
 
-    const summary = useMemo(() => {
-        const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-        const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
-        return { totalIncome, totalExpense, net: totalIncome - totalExpense };
-    }, [transactions]);
-    
-    const budgetSummary = useMemo(() => {
-        if (!settings || !annualData || !cycle) return null;
-        const currentYear = cycle.start.getFullYear();
-        const yearData = annualData[currentYear.toString()];
-        if (!yearData || !yearData.budget) return null;
-        
-        // ★★★ここからが収入予実計算の修正箇所です★★★
-        let plannedIncome = yearData.budget.monthlyIncome; // まず月収を基本とする
-        
-        // 夏季賞与のチェック
-        yearData.budget.summerBonusMonths.forEach(month => {
-            const bonusDate = new Date(currentYear, month - 1, yearData.budget.summerBonusPayday);
-            if (isWithinInterval(bonusDate, { start: cycle.start, end: cycle.end })) {
-                plannedIncome += yearData.budget.summerBonus;
-            }
-        });
-
-        // 冬季賞与のチェック
-        yearData.budget.winterBonusMonths.forEach(month => {
-            const bonusDate = new Date(currentYear, month - 1, yearData.budget.winterBonusPayday);
-            if (isWithinInterval(bonusDate, { start: cycle.start, end: cycle.end })) {
-                plannedIncome += yearData.budget.winterBonus;
-            }
-        });
-        // ★★★ここまでが収入予実計算の修正箇所です★★★
-
-        const isBonusCycle = yearData.budget.summerBonusMonths.some(m => isWithinInterval(new Date(currentYear, m - 1, yearData.budget.summerBonusPayday), { start: cycle.start, end: cycle.end })) ||
-                             yearData.budget.winterBonusMonths.some(m => isWithinInterval(new Date(currentYear, m - 1, yearData.budget.winterBonusPayday), { start: cycle.start, end: cycle.end }));
-
-        const budgetById = isBonusCycle ? yearData.budget.bonusMonthBudget : yearData.budget.normalMonthBudget;
-
-        // 定期支払い（ユーザー設定）のうち、このサイクル内に支払日が含まれるものを抽出
-        const userRecurring = recurringPayments.filter(rp => !rp.isSystemGenerated);
-        const cycleRecurring = userRecurring.filter(rp => {
+    // サイクル内の定期支払い（ユーザー設定分のみ）を抽出
+    const cycleRecurring = useMemo(() => {
+        if (!cycle) return [];
+        return recurringPayments.filter(rp => {
+            if (rp.isSystemGenerated) return false;
             let y = cycle.start.getFullYear();
             let m = cycle.start.getMonth();
             const ey = cycle.end.getFullYear();
@@ -124,10 +89,47 @@ export default function DashboardTab() {
             }
             return false;
         });
+    }, [cycle, recurringPayments]);
+
+    const summary = useMemo(() => {
+        const txIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
+        const txExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
+        const recurringIncome = cycleRecurring.filter(rp => rp.type === 'income').reduce((acc, rp) => acc + rp.amount, 0);
+        const recurringExpense = cycleRecurring.filter(rp => rp.type === 'expense').reduce((acc, rp) => acc + rp.amount, 0);
+        const totalIncome = txIncome + recurringIncome;
+        const totalExpense = txExpense + recurringExpense;
+        return { totalIncome, totalExpense, net: totalIncome - totalExpense };
+    }, [transactions, cycleRecurring]);
+
+    const budgetSummary = useMemo(() => {
+        if (!settings || !annualData || !cycle) return null;
+        const currentYear = cycle.start.getFullYear();
+        const yearData = annualData[currentYear.toString()];
+        if (!yearData || !yearData.budget) return null;
+
+        let plannedIncome = yearData.budget.monthlyIncome;
+
+        yearData.budget.summerBonusMonths.forEach(month => {
+            const bonusDate = new Date(currentYear, month - 1, yearData.budget.summerBonusPayday);
+            if (isWithinInterval(bonusDate, { start: cycle.start, end: cycle.end })) {
+                plannedIncome += yearData.budget.summerBonus;
+            }
+        });
+        yearData.budget.winterBonusMonths.forEach(month => {
+            const bonusDate = new Date(currentYear, month - 1, yearData.budget.winterBonusPayday);
+            if (isWithinInterval(bonusDate, { start: cycle.start, end: cycle.end })) {
+                plannedIncome += yearData.budget.winterBonus;
+            }
+        });
+
+        const isBonusCycle = yearData.budget.summerBonusMonths.some(m => isWithinInterval(new Date(currentYear, m - 1, yearData.budget.summerBonusPayday), { start: cycle.start, end: cycle.end })) ||
+                             yearData.budget.winterBonusMonths.some(m => isWithinInterval(new Date(currentYear, m - 1, yearData.budget.winterBonusPayday), { start: cycle.start, end: cycle.end }));
+
+        const budgetById = isBonusCycle ? yearData.budget.bonusMonthBudget : yearData.budget.normalMonthBudget;
+
         const cycleRecurringExpense = cycleRecurring.filter(rp => rp.type === 'expense');
         const cycleRecurringIncome = cycleRecurring.filter(rp => rp.type === 'income');
 
-        // 定期収入を plannedIncome に加算
         plannedIncome += cycleRecurringIncome.reduce((sum, rp) => sum + rp.amount, 0);
 
         const recurringExpenseByCategory: Record<string, number> = {};
@@ -140,7 +142,8 @@ export default function DashboardTab() {
 
         const expenseDetails = settings.expenseCategories.map(cat => {
             const budget = (budgetById[cat.id] || 0) + (recurringExpenseByCategory[cat.id] || 0);
-            const actual = transactions.filter(t => t.type === 'expense' && t.category === cat.id).reduce((sum, t) => sum + t.amount, 0);
+            const txActual = transactions.filter(t => t.type === 'expense' && t.category === cat.id).reduce((sum, t) => sum + t.amount, 0);
+            const actual = txActual + (recurringExpenseByCategory[cat.id] || 0);
             return { name: cat.name, budget, actual };
         }).filter(d => d.budget > 0 || d.actual > 0);
 
@@ -149,7 +152,7 @@ export default function DashboardTab() {
             plannedExpense, actualExpense: summary.totalExpense,
             expenseDetails
         };
-    }, [settings, annualData, cycle, transactions, summary, recurringPayments]);
+    }, [settings, annualData, cycle, transactions, summary, cycleRecurring]);
 
     if (!settings || !cycle) { return <p>設定を読み込んでいます...</p>; }
 
