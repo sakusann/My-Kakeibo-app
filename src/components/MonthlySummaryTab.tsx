@@ -21,6 +21,18 @@ const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('ja-JP').format(amount);
 };
 
+const formatYAxis = (value: number) => {
+    const absVal = Math.abs(value);
+    if (absVal >= 10000) {
+        const man = value / 10000;
+        return `${Number.isInteger(man) ? man : man.toFixed(1)}万`;
+    } else if (absVal >= 1000) {
+        const sen = value / 1000;
+        return `${Number.isInteger(sen) ? sen : sen.toFixed(1)}千`;
+    }
+    return `${value}`;
+};
+
 // ★★★ここからが修正の核心です★★★
 // DayContentコンポーネントを、propsを明示的に受け取るように修正
 function DayContent(props: {
@@ -59,9 +71,9 @@ function DayContent(props: {
             <div className={cn("font-semibold self-start", activeModifiers.today && "font-bold text-white bg-primary rounded-full px-1.5 py-0.5 w-fit")}>{date.getDate()}</div>
             <div className="flex-grow overflow-y-auto space-y-1 text-xs mt-1">
                 {dayRecurringPayments.map((rp: RecurringPayment) => (
-                    <div key={`rp-${rp.id}`} className="text-yellow-700 dark:text-yellow-400" title={`${rp.title}: ${formatCurrency(rp.amount)}`}>
+                    <div key={`rp-${rp.id}`} className={rp.type === 'income' ? 'text-green-600' : 'text-orange-600'} title={`[定期] ${rp.title}: ${formatCurrency(rp.amount)}`}>
                         <p className="truncate font-medium">{getCategoryName(rp.categoryId)}</p>
-                        <p className="font-semibold text-right">{formatCurrency(rp.amount)}</p>
+                        <p className="font-semibold text-right">{rp.type === 'income' ? '+' : '-'}{formatCurrency(rp.amount)}</p>
                     </div>
                 ))}
                 {dayTransactions.map((t: Transaction) => (
@@ -132,11 +144,32 @@ export default function MonthlySummaryTab() {
         const days = eachDayOfInterval({ start: cycle.start, end: cycle.end });
         let currentBalance = startingBalance;
         return days.map(day => {
-            const dailyNet = transactions.filter(t => isSameDay(parseISO(t.date), day)).reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
-            currentBalance += dailyNet;
+            const calendarMonth = day.getMonth() + 1;
+            const calendarYear = day.getFullYear();
+
+            // 手動入力の取引
+            const txNet = transactions
+                .filter(t => isSameDay(parseISO(t.date), day))
+                .reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
+
+            // 定期支払い（この日が支払日のもの）
+            const recurringNet = recurringPayments
+                .filter(rp => {
+                    if (rp.isSystemGenerated) {
+                        if (!rp.id.includes(calendarYear.toString())) return false;
+                        if (yearData.budget) {
+                            if (rp.title.includes('夏季賞与') && !yearData.budget.summerBonusMonths.includes(calendarMonth)) return false;
+                            if (rp.title.includes('冬季賞与') && !yearData.budget.winterBonusMonths.includes(calendarMonth)) return false;
+                        }
+                    }
+                    return isSameDay(new Date(calendarYear, calendarMonth - 1, rp.paymentDay), day);
+                })
+                .reduce((acc, rp) => acc + (rp.type === 'income' ? rp.amount : -rp.amount), 0);
+
+            currentBalance += txNet + recurringNet;
             return { date: format(day, 'M/d'), 残高: currentBalance };
         });
-    }, [cycle, transactions, annualData, settings]);
+    }, [cycle, transactions, annualData, settings, recurringPayments]);
     
     if (!settings || !cycle) { return <p>設定を読み込んでいます...</p>; }
 
@@ -208,7 +241,7 @@ export default function MonthlySummaryTab() {
                     </Card>
                 </TabsContent>
                 <TabsContent value="chart">
-                    <Card><CardHeader><CardTitle>残高推移</CardTitle></CardHeader><CardContent className="h-96"><ResponsiveContainer width="100%" height="100%"><LineChart data={balanceChartData} margin={{ top: 5, right: 20, left: 30, bottom: 5 }}><XAxis dataKey="date" /><YAxis tickFormatter={(value) => `¥${value/1000}k`} domain={['dataMin', 'dataMax']}/><Tooltip formatter={(value:number) => formatCurrency(value)} /><Legend /><Line type="monotone" dataKey="残高" stroke="#8884d8" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></CardContent></Card>
+                    <Card><CardHeader><CardTitle>残高推移</CardTitle></CardHeader><CardContent className="h-96"><ResponsiveContainer width="100%" height="100%"><LineChart data={balanceChartData} margin={{ top: 5, right: 20, left: 30, bottom: 5 }}><XAxis dataKey="date" /><YAxis tickFormatter={formatYAxis} domain={['dataMin', 'dataMax']}/><Tooltip formatter={(value:number) => formatCurrency(value)} /><Legend /><Line type="monotone" dataKey="残高" stroke="#8884d8" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></CardContent></Card>
                 </TabsContent>
             </Tabs>
         </div>
