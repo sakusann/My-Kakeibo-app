@@ -56,7 +56,7 @@ const AppShell = () => {
             </header>
             
             <Tabs defaultValue="dashboard">
-                <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
+                <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
                     <TabsTrigger value="dashboard">ダッシュボード</TabsTrigger>
                     <TabsTrigger value="transactions">取引履歴</TabsTrigger>
                     <TabsTrigger value="monthly">月次サマリー</TabsTrigger>
