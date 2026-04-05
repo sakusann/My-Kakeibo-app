@@ -92,14 +92,10 @@ export default function DashboardTab() {
     }, [cycle, recurringPayments]);
 
     const summary = useMemo(() => {
-        const txIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
-        const txExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
-        const recurringIncome = cycleRecurring.filter(rp => rp.type === 'income').reduce((acc, rp) => acc + rp.amount, 0);
-        const recurringExpense = cycleRecurring.filter(rp => rp.type === 'expense').reduce((acc, rp) => acc + rp.amount, 0);
-        const totalIncome = txIncome + recurringIncome;
-        const totalExpense = txExpense + recurringExpense;
+        const totalIncome = transactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
+        const totalExpense = transactions.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
         return { totalIncome, totalExpense, net: totalIncome - totalExpense };
-    }, [transactions, cycleRecurring]);
+    }, [transactions]);
 
     const budgetSummary = useMemo(() => {
         if (!settings || !annualData || !cycle) return null;
@@ -142,8 +138,7 @@ export default function DashboardTab() {
 
         const expenseDetails = settings.expenseCategories.map(cat => {
             const budget = (budgetById[cat.id] || 0) + (recurringExpenseByCategory[cat.id] || 0);
-            const txActual = transactions.filter(t => t.type === 'expense' && t.category === cat.id).reduce((sum, t) => sum + t.amount, 0);
-            const actual = txActual + (recurringExpenseByCategory[cat.id] || 0);
+            const actual = transactions.filter(t => t.type === 'expense' && t.category === cat.id).reduce((sum, t) => sum + t.amount, 0);
             return { name: cat.name, budget, actual };
         }).filter(d => d.budget > 0 || d.actual > 0);
 
