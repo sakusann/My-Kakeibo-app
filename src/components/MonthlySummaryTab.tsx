@@ -126,15 +126,15 @@ export default function MonthlySummaryTab() {
         const cycleIndex = cyclesInYear.findIndex(c => isSameDay(c.start, cycle.start));
         let startingBalance = yearData.budget.startingBalance;
         if (cycleIndex > 0) {
-             const prevMonthIndex = cycle.start.getMonth() === 0 ? 11 : cycle.start.getMonth() - 1;
-             startingBalance = yearData.budget.plannedBalance[prevMonthIndex] ?? yearData.budget.startingBalance;
+            const prevMonthIndex = cycle.start.getMonth() - 1;
+            startingBalance = yearData.budget.plannedBalance[prevMonthIndex] ?? yearData.budget.startingBalance;
         }
         const days = eachDayOfInterval({ start: cycle.start, end: cycle.end });
         let currentBalance = startingBalance;
         return days.map(day => {
             const dailyNet = transactions.filter(t => isSameDay(parseISO(t.date), day)).reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
             currentBalance += dailyNet;
-            return { date: format(day, 'd'), 残高: currentBalance };
+            return { date: format(day, 'M/d'), 残高: currentBalance };
         });
     }, [cycle, transactions, annualData, settings]);
     
