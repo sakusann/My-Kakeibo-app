@@ -19,7 +19,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"; // エイリアスパスを使用
+} from "./ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +29,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"; // エイリアスパスを使用
+} from "./ui/alert-dialog";
 // ★★★ここまでが修正の核心です★★★
 import { useToast } from './ui/use-toast';
 

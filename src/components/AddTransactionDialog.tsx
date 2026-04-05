@@ -89,17 +89,20 @@ export default function AddTransactionDialog({ open, onOpenChange, transactionTo
         if (!currentUser) return;
 
         try {
+            const utcDate = data.date;
+
             const dataToSave = {
                 ...data,
                 userId: currentUser.uid,
-                date: Timestamp.fromDate(data.date),
+                date: Timestamp.fromDate(utcDate),
             };
 
             if (isEditMode && transactionToEdit) {
                 // 編集モードの場合
                 await updateTransaction(transactionToEdit.id, {
-                    ...dataToSave,
-                    date: data.date.toISOString(), // Convert Date to string
+                    ...data,
+                    userId: currentUser.uid,
+                    date: Timestamp.fromDate(utcDate),
                 });
                 toast({ title: "成功", description: "取引を更新しました。" });
             } else {

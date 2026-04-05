@@ -1,7 +1,7 @@
 // src/contexts/AppContext.tsx
 
 import { createContext, useState, useEffect, ReactNode, useContext, useCallback, useMemo } from 'react';
-import { doc, setDoc, onSnapshot, getDoc, updateDoc, deleteDoc } from 'firebase/firestore'; // updateDoc, deleteDoc をインポート
+import { doc, setDoc, onSnapshot, getDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore'; // updateDoc, deleteDoc をインポート
 import { db } from '../lib/firebase';
 import { useAuthContext } from './AuthContext';
 import { Settings, AnnualData, RecurringPayment, AnnualBudget, Transaction } from '../types';
@@ -14,7 +14,7 @@ interface AppContextType {
   saveSettings: (newSettings: Partial<Settings>) => Promise<void>;
   saveAnnualBudget: (year: string, budgetData: AnnualBudget) => Promise<void>;
   saveRecurringPayments: (payments: RecurringPayment[]) => Promise<void>;
-  updateTransaction: (id: string, data: Partial<Transaction>) => Promise<void>; // ★ 追加
+  updateTransaction: (id: string, data: Partial<Omit<Transaction, 'date'>> & { date?: Timestamp | string }) => Promise<void>; // ★ 追加
   deleteTransaction: (id: string) => Promise<void>; // ★ 追加
   isInitialSetupDone: boolean;
   getCategoryName: (id: string) => string;
@@ -103,7 +103,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [currentUser]);
 
   // ★★★ここからが修正の核心です★★★
-  const updateTransaction = useCallback(async (id: string, data: Partial<Transaction>) => {
+  const updateTransaction = useCallback(async (id: string, data: Partial<Omit<Transaction, 'date'>> & { date?: Timestamp | string }) => {
     if (!currentUser) return;
     const transDocRef = doc(db, 'users', currentUser.uid, 'transactions', id);
     await updateDoc(transDocRef, data);
