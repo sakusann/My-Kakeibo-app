@@ -12,7 +12,7 @@ import { getPaydayCycle, formatCycle, getCyclesForYear } from '../lib/dateUtils'
 import { Transaction, FirestoreTransaction, PaydayCycle, RecurringPayment, AnnualData } from '../types';
 import { ResponsiveContainer, LineChart, XAxis, YAxis, Tooltip, Line, Legend } from 'recharts';
 import { DayPicker, DayContent as DayContentPrimitive, DateFormatter } from "react-day-picker";
-import { format, eachDayOfInterval, isSameDay, addDays, isWithinInterval } from 'date-fns';
+import { format, eachDayOfInterval, isSameDay, addDays, isWithinInterval, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
@@ -38,7 +38,7 @@ function DayContent(props: {
         return <div className="flex items-center justify-center h-full text-muted-foreground">{date.getDate()}</div>;
     }
 
-    const dayTransactions = transactions.filter((t: Transaction) => isSameDay(new Date(t.date), date));
+    const dayTransactions = transactions.filter((t: Transaction) => isSameDay(parseISO(t.date), date));
     const dayRecurringPayments = recurringPayments.filter((rp: RecurringPayment) => {
         const calendarMonth = date.getMonth() + 1;
         const calendarYear = date.getFullYear();
@@ -97,16 +97,22 @@ export default function MonthlySummaryTab() {
         if (!currentUser || !cycle) { setLoading(false); return; }
         setLoading(true);
         const fetchTransactions = async () => {
-            const tCollection = collection(db, 'users', currentUser.uid, 'transactions');
-            const q = query(tCollection, where('date', '>=', Timestamp.fromDate(cycle.start)), where('date', '<=', Timestamp.fromDate(cycle.end)), orderBy('date', 'asc'));
-            const querySnapshot = await getDocs(q);
-            const fetchedTransactions = querySnapshot.docs.map(doc => {
-                const data = doc.data() as FirestoreTransaction;
-                const dateObject = data.date && typeof data.date.toDate === 'function' ? data.date.toDate() : new Date(data.date as any);
-                return { ...data, id: doc.id, date: dateObject.toISOString().split('T')[0], };
-            });
-            setTransactions(fetchedTransactions);
-            setLoading(false);
+            try {
+                const tCollection = collection(db, 'users', currentUser.uid, 'transactions');
+                const q = query(tCollection, where('date', '>=', Timestamp.fromDate(cycle.start)), where('date', '<=', Timestamp.fromDate(cycle.end)), orderBy('date', 'asc'));
+                const querySnapshot = await getDocs(q);
+                const fetchedTransactions = querySnapshot.docs.map(doc => {
+                    const data = doc.data() as FirestoreTransaction;
+                    const dateObject = data.date && typeof data.date.toDate === 'function' ? data.date.toDate() : new Date(data.date as any);
+                    return { ...data, id: doc.id, date: dateObject.toISOString().split('T')[0], };
+                });
+                setTransactions(fetchedTransactions);
+            } catch (error) {
+                console.error("取引データの取得エラー:", error);
+                setTransactions([]);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchTransactions();
     }, [currentUser, cycle]);
@@ -126,7 +132,7 @@ export default function MonthlySummaryTab() {
         const days = eachDayOfInterval({ start: cycle.start, end: cycle.end });
         let currentBalance = startingBalance;
         return days.map(day => {
-            const dailyNet = transactions.filter(t => isSameDay(new Date(t.date), day)).reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
+            const dailyNet = transactions.filter(t => isSameDay(parseISO(t.date), day)).reduce((acc, t) => acc + (t.type === 'income' ? t.amount : -t.amount), 0);
             currentBalance += dailyNet;
             return { date: format(day, 'd'), 残高: currentBalance };
         });

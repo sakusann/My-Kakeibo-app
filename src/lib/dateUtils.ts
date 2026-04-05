@@ -51,7 +51,7 @@ export function formatCycle(cycle: PaydayCycle): string {
 
 export function getCyclesForYear(year: number, settings: PaydaySettings): PaydayCycle[] {
     const cycles: PaydayCycle[] = [];
-    if (!settings?.paydaySettings) return [];
+    if (!settings) return [];
     let currentDate = new Date(year, 0, 1);
     for (let i = 0; i < 13; i++) {
         const cycle = getPaydayCycle(currentDate, settings);
