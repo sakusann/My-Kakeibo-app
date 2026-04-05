@@ -40,7 +40,7 @@ const BudgetItem = ({ label, budget, actual }: { label: string, budget: number, 
 
 export default function DashboardTab() {
     const { currentUser } = useAuthContext();
-    const { settings, annualData } = useAppContext();
+    const { settings, annualData, recurringPayments } = useAppContext();
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -107,11 +107,39 @@ export default function DashboardTab() {
 
         const isBonusCycle = yearData.budget.summerBonusMonths.some(m => isWithinInterval(new Date(currentYear, m - 1, yearData.budget.summerBonusPayday), { start: cycle.start, end: cycle.end })) ||
                              yearData.budget.winterBonusMonths.some(m => isWithinInterval(new Date(currentYear, m - 1, yearData.budget.winterBonusPayday), { start: cycle.start, end: cycle.end }));
-        
+
         const budgetById = isBonusCycle ? yearData.budget.bonusMonthBudget : yearData.budget.normalMonthBudget;
-        const plannedExpense = Object.values(budgetById).reduce((sum, val) => sum + val, 0);
+
+        // 定期支払い（ユーザー設定）のうち、このサイクル内に支払日が含まれるものを抽出
+        const userRecurring = recurringPayments.filter(rp => !rp.isSystemGenerated);
+        const cycleRecurring = userRecurring.filter(rp => {
+            let y = cycle.start.getFullYear();
+            let m = cycle.start.getMonth();
+            const ey = cycle.end.getFullYear();
+            const em = cycle.end.getMonth();
+            while (y < ey || (y === ey && m <= em)) {
+                if (isWithinInterval(new Date(y, m, rp.paymentDay), { start: cycle.start, end: cycle.end })) return true;
+                m++;
+                if (m > 11) { m = 0; y++; }
+            }
+            return false;
+        });
+        const cycleRecurringExpense = cycleRecurring.filter(rp => rp.type === 'expense');
+        const cycleRecurringIncome = cycleRecurring.filter(rp => rp.type === 'income');
+
+        // 定期収入を plannedIncome に加算
+        plannedIncome += cycleRecurringIncome.reduce((sum, rp) => sum + rp.amount, 0);
+
+        const recurringExpenseByCategory: Record<string, number> = {};
+        cycleRecurringExpense.forEach(rp => {
+            recurringExpenseByCategory[rp.categoryId] = (recurringExpenseByCategory[rp.categoryId] || 0) + rp.amount;
+        });
+
+        const plannedExpense = Object.values(budgetById).reduce((sum, val) => sum + val, 0)
+            + cycleRecurringExpense.reduce((sum, rp) => sum + rp.amount, 0);
+
         const expenseDetails = settings.expenseCategories.map(cat => {
-            const budget = budgetById[cat.id] || 0;
+            const budget = (budgetById[cat.id] || 0) + (recurringExpenseByCategory[cat.id] || 0);
             const actual = transactions.filter(t => t.type === 'expense' && t.category === cat.id).reduce((sum, t) => sum + t.amount, 0);
             return { name: cat.name, budget, actual };
         }).filter(d => d.budget > 0 || d.actual > 0);
@@ -121,7 +149,7 @@ export default function DashboardTab() {
             plannedExpense, actualExpense: summary.totalExpense,
             expenseDetails
         };
-    }, [settings, annualData, cycle, transactions, summary]);
+    }, [settings, annualData, cycle, transactions, summary, recurringPayments]);
 
     if (!settings || !cycle) { return <p>設定を読み込んでいます...</p>; }
 
