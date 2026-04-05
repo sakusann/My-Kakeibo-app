@@ -8,7 +8,7 @@ import { useAppContext } from '../contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { getPaydayCycle, formatCycle, getCyclesForYear } from '../lib/dateUtils';
+import { getPaydayCycle, formatCycle } from '../lib/dateUtils';
 import { Transaction, FirestoreTransaction, PaydayCycle, RecurringPayment, AnnualData } from '../types';
 import { ResponsiveContainer, LineChart, XAxis, YAxis, Tooltip, Line, Legend } from 'recharts';
 import { DayPicker, DayContent as DayContentPrimitive, DateFormatter } from "react-day-picker";
@@ -134,13 +134,7 @@ export default function MonthlySummaryTab() {
         const year = cycle.start.getFullYear().toString();
         const yearData = annualData[year];
         if (!yearData) return [];
-        const cyclesInYear = getCyclesForYear(parseInt(year, 10), settings.paydaySettings);
-        const cycleIndex = cyclesInYear.findIndex(c => isSameDay(c.start, cycle.start));
-        let startingBalance = yearData.budget.startingBalance;
-        if (cycleIndex > 0) {
-            const prevMonthIndex = cycle.start.getMonth() - 1;
-            startingBalance = yearData.budget.plannedBalance[prevMonthIndex] ?? yearData.budget.startingBalance;
-        }
+        const startingBalance = yearData.budget.startingBalance;
         const days = eachDayOfInterval({ start: cycle.start, end: cycle.end });
         let currentBalance = startingBalance;
         return days.map(day => {
@@ -241,7 +235,7 @@ export default function MonthlySummaryTab() {
                     </Card>
                 </TabsContent>
                 <TabsContent value="chart">
-                    <Card><CardHeader><CardTitle>残高推移</CardTitle></CardHeader><CardContent className="h-96"><ResponsiveContainer width="100%" height="100%"><LineChart data={balanceChartData} margin={{ top: 5, right: 20, left: 30, bottom: 5 }}><XAxis dataKey="date" /><YAxis tickFormatter={formatYAxis} domain={['dataMin', 'dataMax']}/><Tooltip formatter={(value:number) => formatCurrency(value)} /><Legend /><Line type="monotone" dataKey="残高" stroke="#8884d8" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></CardContent></Card>
+                    <Card><CardHeader><CardTitle>残高推移</CardTitle></CardHeader><CardContent className="h-96"><ResponsiveContainer width="100%" height="100%"><LineChart data={balanceChartData} margin={{ top: 5, right: 20, left: 30, bottom: 5 }}><XAxis dataKey="date" /><YAxis tickFormatter={formatYAxis} domain={[(dataMin: number) => Math.min(0, dataMin), (dataMax: number) => Math.max(0, dataMax)]}/><Tooltip formatter={(value:number) => formatCurrency(value)} /><Legend /><Line type="monotone" dataKey="残高" stroke="#8884d8" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></CardContent></Card>
                 </TabsContent>
             </Tabs>
         </div>
