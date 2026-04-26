@@ -52,13 +52,14 @@ export default function SetupDialog({ open, onOpenChange }: SetupDialogProps) {
                     <DialogTitle>設定</DialogTitle>
                     <DialogDescription>アプリの各種設定を行います。</DialogDescription>
                 </DialogHeader>
-                <div className="flex-grow flex gap-6 overflow-hidden mt-4">
-                    <nav className="w-1/4 border-r pr-6">
-                        <ul className="space-y-2">
-                            {['annual', 'categories', 'recurring'].map(tab => ( <li key={tab}> <Button type="button" variant={activeTab === tab ? 'secondary' : 'ghost'} className="w-full justify-start" onClick={() => setActiveTab(tab)}> { {annual: '年間設定', categories: 'カテゴリ', recurring: '定期支払い'}[tab] } </Button> </li> ))}
-                        </ul>
+                <div className="flex-grow flex flex-col md:flex-row gap-4 md:gap-6 overflow-hidden mt-4">
+                    {/* モバイル: 横スクロールタブ / デスクトップ: サイドバー */}
+                    <nav className="flex-shrink-0 md:w-1/4 md:border-r md:pr-6">
+                        <div className="flex md:flex-col gap-1 md:gap-2 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
+                            {['annual', 'categories', 'recurring'].map(tab => ( <Button key={tab} type="button" variant={activeTab === tab ? 'secondary' : 'ghost'} className="flex-shrink-0 min-h-[44px] md:w-full justify-start whitespace-nowrap" onClick={() => setActiveTab(tab)}> { {annual: '年間設定', categories: 'カテゴリ', recurring: '定期支払い'}[tab] } </Button> ))}
+                        </div>
                     </nav>
-                    <div className="w-3/4 overflow-y-auto pr-2">
+                    <div className="flex-1 overflow-y-auto pr-2">
                         {activeTab === 'annual' && <AnnualSetupForm settings={settings} annualData={annualData} onSaveAnnual={saveAnnualBudget} onSaveSettings={saveSettings} year={selectedYear} setYear={setSelectedYear} recurringPayments={recurringPayments} saveRecurringPayments={saveRecurringPayments} />}
                         {activeTab === 'categories' && <CategoriesSetupForm settings={settings} onSave={saveSettings} />}
                         {activeTab === 'recurring' && <RecurringPaymentsForm settings={settings} recurringPayments={recurringPayments} onSave={saveRecurringPayments} />}
