@@ -49,7 +49,12 @@ export default {
   				'3': 'hsl(var(--chart-3))',
   				'4': 'hsl(var(--chart-4))',
   				'5': 'hsl(var(--chart-5))'
-  			}
+  			},
+  			income:       '#1E9E6B',
+  			expense:      '#E05535',
+  			'income-light':  '#EDFAF3',
+  			'expense-light': '#FEF2EF',
+  			'primary-light': '#EEF2FF',
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
